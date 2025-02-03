@@ -1,0 +1,34 @@
+/ {
+    ccd0 {
+        compatible = "toshiba,tcd1304";
+        status = "okay";
+        clock-frequency = <1600000>;
+        pwms = <&pwm1 4 PWM_NSEC(2500) PWM_POLARITY_NORMAL>,
+                <&pwm0 1 PWM_NSEC(2500) PWM_POLARITY_NORMAL>;
+        pwm-names = "master", "trigger";
+    };
+};
+
+&timers2 {
+    status = "okay";
+    st,prescaler = <0>;
+
+    pwm0: pwm {
+        status = "okay";
+
+        pinctrl-0 = <&tim2_ch1_pa0>;
+        pinctrl-names = "default";
+    };
+};
+
+&timers5 {
+    status = "okay";
+
+    pwm1: pwm {
+        status = "okay";
+
+        pinctrl-0 = <&tim5_ch4_pa3>;
+        pinctrl-names = "default";
+    };
+};
+

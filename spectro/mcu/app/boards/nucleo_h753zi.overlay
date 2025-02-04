@@ -6,7 +6,10 @@
         pwms = <&pwm1 4 PWM_NSEC(2500) PWM_POLARITY_NORMAL>,
                 <&pwm0 1 PWM_NSEC(2500) PWM_POLARITY_NORMAL>;
         pwm-names = "master", "trigger";
-    };
+
+        gpios = <&gpioc 8 GPIO_ACTIVE_HIGH>,
+                <&gpioc 9 GPIO_ACTIVE_LOW>,
+                <&gpioc 10 GPIO_ACTIVE_HIGH>; };
 };
 
 &timers2 {
@@ -32,3 +35,14 @@
     };
 };
 
+&spi1 {
+    status = "okay";
+
+    adc0: adc@0 {
+        status = "okay";
+        compatible = "ti,ads8329";
+        reg = <0>;
+        #io-channel-cells = <1>;
+        spi-max-frequency = <50000000>;
+    };
+};

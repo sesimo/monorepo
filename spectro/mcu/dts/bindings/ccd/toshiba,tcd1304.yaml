@@ -7,11 +7,20 @@ description: Device driver for the TCD1304 CCD Detector
 properties:
   pwms:
     type: phandle-array
+    required: false
 
   pwm-names:
     type: string-array
+    required: false
 
   clock-frequency:
     type: int
-    default: 0
+    required: false
 
+  gpios:
+    type: phandle-array
+    required: true
+
+  io-channels:
+    required: true
+    description: "ADC"

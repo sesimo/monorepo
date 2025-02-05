@@ -3,6 +3,9 @@ config TOSHIBA_TCD1304
     bool
     default y
     depends on DT_HAS_TOSHIBA_TCD1304_ENABLED
+    select GPIO
+    select ADC
+
 
 if TOSHIBA_TCD1304
 

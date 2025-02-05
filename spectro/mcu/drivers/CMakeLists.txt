@@ -1,3 +1,3 @@
 
 add_subdirectory_ifdef(CONFIG_ADC adc)
-add_subdirectory_ifdef(CONFIG_CCD ccd)
+add_subdirectory_ifdef(CONFIG_SENSOR sensor)

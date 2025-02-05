@@ -4,6 +4,8 @@ config ADC_ADS8329
     default y
     depends on DT_HAS_TI_ADS8329_ENABLED
     select SPI
+    select GPIO
+    select GPIO_ENABLE_DISABLE_INTERRUPT
 
 if ADC_ADS8329
 

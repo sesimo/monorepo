@@ -284,8 +284,8 @@ static int ads8329_validate_seq(const struct adc_sequence *seq)
         return 0;
 }
 
-static int ads8329_read(const struct device *dev,
-                        const struct adc_sequence *seq)
+static int ads8329_start_read(const struct device *dev,
+                              const struct adc_sequence *seq)
 {
         int status;
         struct ads8329_data *data = dev->data;
@@ -295,16 +295,44 @@ static int ads8329_read(const struct device *dev,
                 return status;
         }
 
-        adc_context_lock(&data->ctx, false, NULL);
-
         data->buffer = seq->buffer;
         adc_context_start_read(&data->ctx, seq);
 
-        status = adc_context_wait_for_completion(&data->ctx);
+        return 0;
+}
+
+static int ads8329_read(const struct device *dev,
+                        const struct adc_sequence *seq)
+{
+        int status;
+        struct ads8329_data *data = dev->data;
+
+        adc_context_lock(&data->ctx, false, NULL);
+        status = ads8329_start_read(dev, seq);
+        if (status == 0) {
+                status = adc_context_wait_for_completion(&data->ctx);
+        }
+
         adc_context_release(&data->ctx, status);
 
         return status;
 }
+
+#ifdef CONFIG_ADC_ASYNC
+static int ads8329_read_async(const struct device *dev,
+                              const struct adc_sequence *seq,
+                              struct k_poll_signal *signal)
+{
+        int status;
+        struct ads8329_data *data = dev->data;
+
+        adc_context_lock(&data->ctx, true, signal);
+        status = ads8329_start_read(dev, seq);
+        adc_context_release(&data->ctx, status);
+
+        return status;
+}
+#endif
 
 static void ads8329_conv_ready_cb(const struct device *port,
                                   struct gpio_callback *cb,
@@ -353,6 +381,10 @@ static void ads8329_aq_thread(void *dev_arg, void *arg2, void *arg3)
 static DEVICE_API(adc, ads8329_api) = {
         .channel_setup = ads8329_channel_setup,
         .read = ads8329_read,
+
+#ifdef CONFIG_ADC_ASYNC
+        .read_async = ads8329_read_async,
+#endif
 };
 
 static int ads8329_init(const struct device *dev)

@@ -1,0 +1,17 @@
+header:
+  version: 1
+
+machine: qemux86-64
+
+distro: poky
+
+target: core-image-sato
+
+repos:
+  poky:
+    url: git://git.yoctoproject.org/poky
+    branch: scarthgap
+    layers:
+      meta:
+      meta-poky:
+      meta-yocto-bsp: 

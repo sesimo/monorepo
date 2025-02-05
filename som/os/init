@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+
+workdir=_work
+
+mkdir -p $workdir
+
+docker build --build-arg KAS_WORK_DIR=$workdir -t som_os .
+docker run --privileged \
+    --mount type=bind,src=$(pwd),target=/home/ubuntu/work \
+    -it som_os

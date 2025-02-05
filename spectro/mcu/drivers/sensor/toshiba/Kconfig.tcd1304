@@ -5,6 +5,7 @@ config TOSHIBA_TCD1304
     depends on DT_HAS_TOSHIBA_TCD1304_ENABLED
     select GPIO
     select ADC
+    select SENSOR_ASYNC_API
 
 
 if TOSHIBA_TCD1304

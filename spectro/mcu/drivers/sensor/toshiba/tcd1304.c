@@ -4,6 +4,7 @@
 #include <zephyr/logging/log.h>
 #include <zephyr/drivers/gpio.h>
 #include <zephyr/drivers/adc.h>
+#include <zephyr/drivers/sensor.h>
 
 #if CONFIG_TOSHIBA_TCD1304_PWM
 #include <zephyr/drivers/pwm.h>
@@ -94,15 +95,9 @@ static int tcd1304_clocks_stop(const struct device *dev)
 #endif
 }
 
-static int tcd1304_start_capture(const struct device *dev)
+static void tcd1304_submit(const struct device *sensor,
+                           struct rtio_iodev_sqe *sqe)
 {
-        int status;
-        const struct tcd1304_cfg *cfg;
-
-        cfg = dev->config;
-
-        LOG_ERR("status: %i", status);
-        return 0;
 }
 
 static int tcd1304_init(const struct device *dev)
@@ -144,6 +139,14 @@ static int tcd1304_init(const struct device *dev)
 
         return 0;
 }
+
+extern int tcd1304_get_decoder(const struct device *dev,
+                        const struct sensor_decoder_api **api);
+
+static DEVICE_API(sensor, tcd1304_api) = {
+        .submit = tcd1304_submit,
+        .get_decoder = tcd1304_get_decoder,
+};
 
 #if CONFIG_TOSHIBA_TCD1304_PWM
 #define TCD1304_CLOCK_CFG(node)                                                \

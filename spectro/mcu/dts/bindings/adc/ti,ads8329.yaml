@@ -20,4 +20,4 @@ properties:
     type: phandle-array
 
 io-channel-cells:
-  - channel
+  - input

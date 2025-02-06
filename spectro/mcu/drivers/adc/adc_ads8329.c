@@ -52,6 +52,8 @@ struct ads8329_data {
         struct adc_context ctx;
         struct gpio_callback ready_cb;
 
+        bool timer_active;
+
         struct k_sem sig;
 
         uint16_t *buffer;
@@ -177,6 +179,11 @@ static void adc_context_enable_timer(struct adc_context *ctx)
         dev = data->dev;
         cfg = dev->config;
 
+        /* Don't re-enable */
+        if (data->timer_active) {
+                return;
+        }
+
         status = gpio_pin_interrupt_configure_dt(&cfg->ready_gpio,
                                                  GPIO_INT_EDGE_TO_ACTIVE);
         if (status != 0) {
@@ -191,6 +198,8 @@ static void adc_context_enable_timer(struct adc_context *ctx)
                 adc_context_complete(ctx, status);
                 return;
         }
+
+        data->timer_active = true;
 }
 
 static void adc_context_disable_timer(struct adc_context *ctx)
@@ -214,6 +223,8 @@ static void adc_context_disable_timer(struct adc_context *ctx)
         if (status != 0) {
                 LOG_ERR("gpio disable: %i", status);
         }
+
+        data->timer_active = false;
 }
 
 static int ads8329_channel_setup(const struct device *dev,

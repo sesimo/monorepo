@@ -7,14 +7,14 @@
         <mxCell id="s2RkI9bYxUWYaikwDauW-33" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;dashed=1;" edge="1" parent="1" source="s2RkI9bYxUWYaikwDauW-5" target="s2RkI9bYxUWYaikwDauW-32">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="s2RkI9bYxUWYaikwDauW-5" value="Detector&lt;div&gt;CCD&lt;/div&gt;" style="whiteSpace=wrap;html=1;" vertex="1" parent="1">
-          <mxGeometry x="10" y="10" width="120" height="60" as="geometry" />
+        <mxCell id="s2RkI9bYxUWYaikwDauW-5" value="&lt;div&gt;CCD&lt;/div&gt;" style="whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="10" y="30" width="120" height="60" as="geometry" />
         </mxCell>
         <mxCell id="s2RkI9bYxUWYaikwDauW-35" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;dashed=1;strokeWidth=2;" edge="1" parent="1" source="s2RkI9bYxUWYaikwDauW-32" target="s2RkI9bYxUWYaikwDauW-34">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="s2RkI9bYxUWYaikwDauW-32" value="Amplification&lt;div&gt;Op-Amp&lt;/div&gt;" style="whiteSpace=wrap;html=1;" vertex="1" parent="1">
-          <mxGeometry x="170" y="10" width="120" height="60" as="geometry" />
+        <mxCell id="s2RkI9bYxUWYaikwDauW-32" value="&lt;div&gt;Op-Amp&lt;/div&gt;" style="whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="170" y="30" width="120" height="60" as="geometry" />
         </mxCell>
         <mxCell id="s2RkI9bYxUWYaikwDauW-37" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;shape=link;dashed=1;dashPattern=1 1;" edge="1" parent="1" source="s2RkI9bYxUWYaikwDauW-34" target="s2RkI9bYxUWYaikwDauW-36">
           <mxGeometry relative="1" as="geometry" />
@@ -24,24 +24,37 @@
             <mxPoint x="-3" y="14" as="offset" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="s2RkI9bYxUWYaikwDauW-34" value="Sampling&lt;div&gt;ADC&lt;/div&gt;" style="whiteSpace=wrap;html=1;" vertex="1" parent="1">
-          <mxGeometry x="330" y="10" width="120" height="60" as="geometry" />
+        <mxCell id="s2RkI9bYxUWYaikwDauW-34" value="&lt;div&gt;ADC&lt;/div&gt;" style="whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="330" y="30" width="120" height="60" as="geometry" />
         </mxCell>
-        <mxCell id="s2RkI9bYxUWYaikwDauW-40" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="s2RkI9bYxUWYaikwDauW-36" target="s2RkI9bYxUWYaikwDauW-39">
+        <mxCell id="s2RkI9bYxUWYaikwDauW-40" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" edge="1" parent="1" source="s2RkI9bYxUWYaikwDauW-36" target="s2RkI9bYxUWYaikwDauW-5">
           <mxGeometry relative="1" as="geometry">
+            <mxPoint x="370" y="140.02857142857135" as="targetPoint" />
             <Array as="points">
               <mxPoint x="590" y="120" />
+              <mxPoint x="70" y="120" />
             </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="s2RkI9bYxUWYaikwDauW-36" value="Processing&lt;div&gt;Microcontroller&lt;/div&gt;" style="whiteSpace=wrap;html=1;" vertex="1" parent="1">
-          <mxGeometry x="530" y="10" width="120" height="60" as="geometry" />
+        <mxCell id="s2RkI9bYxUWYaikwDauW-50" value="Control" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" vertex="1" connectable="0" parent="s2RkI9bYxUWYaikwDauW-40">
+          <mxGeometry x="0.0246" y="1" relative="1" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
         </mxCell>
-        <mxCell id="s2RkI9bYxUWYaikwDauW-41" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;startArrow=oval;startFill=1;" edge="1" parent="1" source="s2RkI9bYxUWYaikwDauW-39" target="s2RkI9bYxUWYaikwDauW-5">
-          <mxGeometry relative="1" as="geometry" />
+        <mxCell id="s2RkI9bYxUWYaikwDauW-36" value="&lt;div&gt;Micro controller&lt;/div&gt;" style="whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="530" y="30" width="120" height="60" as="geometry" />
         </mxCell>
-        <mxCell id="s2RkI9bYxUWYaikwDauW-39" value="Inverter&lt;div&gt;NOT-Gate&lt;/div&gt;" style="whiteSpace=wrap;html=1;" vertex="1" parent="1">
-          <mxGeometry x="250" y="90" width="120" height="60" as="geometry" />
+        <mxCell id="s2RkI9bYxUWYaikwDauW-43" value="Detector" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+          <mxGeometry x="35" width="70" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="s2RkI9bYxUWYaikwDauW-44" value="Amplification" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+          <mxGeometry x="185" width="90" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="s2RkI9bYxUWYaikwDauW-45" value="Sampling" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+          <mxGeometry x="355" width="70" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="s2RkI9bYxUWYaikwDauW-46" value="Processing" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+          <mxGeometry x="550" width="80" height="30" as="geometry" />
         </mxCell>
       </root>
     </mxGraphModel>

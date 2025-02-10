@@ -6,7 +6,7 @@ config TOSHIBA_TCD1304
     select GPIO
     select ADC
     select SENSOR_ASYNC_API
-
+    select ADC_ASYNC
 
 if TOSHIBA_TCD1304
 

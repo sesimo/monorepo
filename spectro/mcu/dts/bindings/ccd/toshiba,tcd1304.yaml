@@ -13,7 +13,7 @@ properties:
     type: string-array
     required: false
 
-  clock-frequency:
+  sampling-rate:
     type: int
     required: false
 

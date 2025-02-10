@@ -5,16 +5,34 @@ static int tcd1304_get_frame_count(const uint8_t *buffer,
                                    struct sensor_chan_spec channel,
                                    uint16_t *frame_count)
 {
+        ARG_UNUSED(channel);
+        ARG_UNUSED(buffer);
+        ARG_UNUSED(frame_count);
+
+        return -ENOTSUP;
 }
+
 static int tcd1304_get_size_info(struct sensor_chan_spec channel,
                                  size_t *base_size, size_t *frame_size)
 {
+        ARG_UNUSED(channel);
+        ARG_UNUSED(base_size);
+        ARG_UNUSED(frame_size);
+
+        return -ENOTSUP;
 }
 
 static int tcd1304_decode(const uint8_t *buffer,
                           struct sensor_chan_spec channel, uint32_t *fit,
                           uint16_t max_count, void *data_out)
 {
+        ARG_UNUSED(buffer);
+        ARG_UNUSED(channel);
+        ARG_UNUSED(fit);
+        ARG_UNUSED(max_count);
+        ARG_UNUSED(data_out);
+
+        return -ENOTSUP;
 }
 
 static bool tcd1304_has_trigger(const uint8_t *buffer,

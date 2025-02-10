@@ -2,14 +2,12 @@
     ccd0 {
         compatible = "toshiba,tcd1304";
         status = "okay";
-        clock-frequency = <1600000>;
-        pwms = <&pwm1 4 PWM_NSEC(2500) PWM_POLARITY_NORMAL>,
-                <&pwm0 1 PWM_NSEC(2500) PWM_POLARITY_NORMAL>;
-        pwm-names = "master", "trigger";
-
-        gpios = <&gpioc 8 GPIO_ACTIVE_HIGH>,
-                <&gpioc 9 GPIO_ACTIVE_LOW>,
-                <&gpioc 10 GPIO_ACTIVE_HIGH>; };
+        sampling-rate = <400000>;
+        pwms = <&pwm0 1 PWM_NSEC(2500) PWM_POLARITY_NORMAL>;
+        pwm-names = "clock";
+        gpios = <&gpioc 8 GPIO_ACTIVE_HIGH>, <&gpioc 9 GPIO_ACTIVE_LOW>;
+        io-channels = <&adc0 1>;
+    };
 };
 
 &timers2 {
@@ -44,5 +42,8 @@
         reg = <0>;
         #io-channel-cells = <1>;
         spi-max-frequency = <50000000>;
+        pwms = <&pwm1 4 PWM_NSEC(2500) PWM_POLARITY_NORMAL>;
+        pwm-names = "timer";
+        ready-gpios = <&gpioc 10 GPIO_ACTIVE_LOW>;
     };
 };

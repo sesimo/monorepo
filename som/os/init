@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
 
 workdir=_work
+base=${BASE-poky}
 
 mkdir -p $workdir
 
-docker build --build-arg KAS_WORK_DIR=$workdir -t som_os .
+docker build --build-arg BASE=$base -t som_os-$base .
 docker run --privileged \
+    -v ~/.gitconfig:/etc/gitconfig \
     --mount type=bind,src=$(pwd),target=/home/ubuntu/work \
-    -it som_os
+    -it som_os-$base

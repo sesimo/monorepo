@@ -1,31 +1,46 @@
-
 FROM ubuntu:22.04
 
+ARG BASE=poky
+
 ENV DEBIAN_FRONTEND=noninteractive
+ENV HOME=/home/ubuntu
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential chrpath cpio debianutils diffstat file gawk gcc git \
-    iputils-ping libacl1 liblz4-tool locales python3 python3-git \
-    python3-jinja2 python3-pexpect python3-pip python3-subunit \
-    socat texinfo unzip wget xz-utils zstd python3-venv
+ENV WORKDIR=${HOME}/work
 
-COPY requirements.txt /tmp/requirements.txt
+COPY docker/packages/${BASE}.txt /tmp/packages.txt
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    locales curl python3 python3-pip python3-venv ssh tree meld geany \
+    make xsltproc docbook-utils fop dblatex xmlto file \
+    $(cat /tmp/packages.txt)
 
 RUN locale-gen "en_US.UTF-8"
+
+RUN curl http://commondatastorage.googleapis.com/git-repo-downloads/repo > \
+    /bin/repo
+
+RUN chmod +x /bin/repo
+
+COPY docker/entrypoints/${BASE}.sh /tmp/entrypoint.sh
+RUN chmod +x /tmp/entrypoint.sh
+
+COPY docker/setup/${BASE}.sh /tmp/setup.sh
+RUN chmod +x /tmp/setup.sh
 
 RUN useradd -m ubuntu
 USER ubuntu
 
-ENV HOME=/home/ubuntu
+COPY requirements.txt ${HOME}/src/requirements.txt
+
 RUN python3 -m venv ${HOME}/venv
 
 ENV PATH=${HOME}/venv/bin:${PATH}
 ENV VIRTUAL_ENV=${HOME}/venv
-ENV WORKDIR=${HOME}/work
-
-ARG KAS_WORK_DIR=_work
-ENV KAS_WORK_DIR=${WORKDIR}/${KAS_WORK_DIR}
-
-RUN pip install -r /tmp/requirements.txt
 
 WORKDIR ${WORKDIR}
+
+#RUN /tmp/setup.sh
+
+#SHELL [ "/bin/bash", "/tmp/entrypoint.sh", "/bin/bash", "-c" ]
+#ENTRYPOINT [ "/bin/bash", "/tmp/entrypoint.sh" ]

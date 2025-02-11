@@ -5,7 +5,7 @@ OPTS?="--wave=wave.ghw"
 SOURCES=src/sync.vhd \
 		src/adc.vhd
 
-GHDL_ARGS=--workdir=$(realpath build)
+GHDL_ARGS=--workdir=$(realpath build) --std=08
 
 target_name=$(shell basename $(1) | cut -d"." -f1)
 

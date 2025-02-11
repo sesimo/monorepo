@@ -38,12 +38,21 @@ architecture rtl of ads8329 is
 
     -- Lines to ADC hardware
     signal o_stconv: std_logic;
+    signal i_eoc_unsafe: std_logic;
     signal i_eoc: std_logic;
 
     -- SPI inputs
     signal o_spi_enable: std_logic;
     signal i_spi_active: std_logic;
 begin
+    -- Flip-flopped
+    u_ff_eoc: entity work.ff(rtl) port map(
+        i_clk => i_clk,
+        i_rst_n => i_rst_n,
+        i_sig => i_eoc_unsafe,
+        o_sig => i_eoc
+    );
+
     -- Generate enable signal
     p_enable: process(i_clk, i_rst_n) 
         variable v_count: integer := 0;

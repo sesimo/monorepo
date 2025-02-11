@@ -21,11 +21,6 @@ architecture bhv of tb_adc is
     signal r_stconv: std_logic := '0';
     signal r_eoc: std_logic := '0';
 
-    constant c_ads8329_pins: work.p_ads8329.t_pins := (
-        i_stconv => r_stconv,
-        o_eoc => r_eoc
-    );
-
     constant c_clk_period: time := (1.0 / real(G_CLK_FREQ)) * (1 sec);
 begin
     u_adc: entity work.ads8329(rtl) generic map(
@@ -36,6 +31,9 @@ begin
         i_clk => r_clk,
         i_rst_n => r_rst_n,
         i_start => r_start,
+
+        i_pin_eoc => r_eoc,
+        o_pin_stconv => r_stconv,
 
         o_rdy => r_rdy,
         o_buf => r_buf
@@ -59,7 +57,9 @@ begin
 
     p_eoc: process
     begin
+        r_eoc <= '0';
         wait for c_clk_period * 5;
+        r_eoc <= '1';
         wait;
     end process p_eoc;
 

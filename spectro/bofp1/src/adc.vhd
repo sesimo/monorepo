@@ -3,13 +3,6 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
-package p_ads8329 is
-    type t_pins is record
-        i_stconv: std_logic;
-        o_eoc: std_logic;
-    end record t_pins;
-end package p_ads8329;
-
 entity ads8329 is
     generic (
         G_RESOLUTION: integer := 16;
@@ -21,7 +14,9 @@ entity ads8329 is
         i_clk: in std_logic;
         i_rst_n: in std_logic;
         i_start: in std_logic;
-        i_pins: in p_ads8329.t_pins;
+
+        i_pin_eoc: in std_logic;
+        o_pin_stconv: out std_logic;
 
         o_rdy: out std_logic;
         o_buf: out std_logic_vector(G_RESOLUTION-1 downto 0)
@@ -45,9 +40,7 @@ architecture rtl of ads8329 is
     -- )
 
     -- Lines to ADC hardware
-    signal o_stconv: std_logic;
-    signal i_eoc_unsafe: std_logic;
-    signal i_eoc: std_logic;
+    signal r_eoc: std_logic;
 
     -- SPI inputs
     signal o_spi_enable: std_logic;
@@ -57,8 +50,8 @@ begin
     u_ff_eoc: entity work.ff(rtl) port map(
         i_clk => i_clk,
         i_rst_n => i_rst_n,
-        i_sig => i_eoc_unsafe,
-        o_sig => i_eoc
+        i_sig => i_pin_eoc,
+        o_sig => r_eoc
     );
 
     -- Generate enable signal
@@ -88,10 +81,10 @@ begin
             o_rdy <= '0';
             o_buf <= (others => '0');
             
-            o_stconv <= '0';
-            i_eoc <= '0';
+            o_pin_stconv <= '0';
+            r_eoc <= '0';
         elsif rising_edge(i_clk) and r_enable = '1' then
-            o_stconv <= '0';
+            o_pin_stconv <= '0';
             o_rdy <= '0';
             o_spi_enable <= '0';
 
@@ -99,12 +92,12 @@ begin
                 when S_IDLE =>
                     -- Wait for start signal
                     if i_start = '1' then
-                        o_stconv <= '1';
+                        o_pin_stconv <= '1';
                         r_state <= S_CONVERTING;
                     end if;
                 when S_CONVERTING =>
                     -- Started, wait for conversion to complete
-                    if i_eoc = '1' then
+                    if r_eoc = '1' then
                         o_spi_enable <= '1';
                         r_state <= S_READ;
                     end if;

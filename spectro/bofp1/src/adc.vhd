@@ -3,6 +3,13 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
+package p_ads8329 is
+    type t_pins is record
+        i_stconv: std_logic;
+        o_eoc: std_logic;
+    end record t_pins;
+end package p_ads8329;
+
 entity ads8329 is
     generic (
         G_RESOLUTION: integer := 16;
@@ -14,6 +21,7 @@ entity ads8329 is
         i_clk: in std_logic;
         i_rst_n: in std_logic;
         i_start: in std_logic;
+        i_pins: in p_ads8329.t_pins;
 
         o_rdy: out std_logic;
         o_buf: out std_logic_vector(G_RESOLUTION-1 downto 0)

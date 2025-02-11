@@ -24,7 +24,7 @@ begin
                 o_sig <= 'X';
                 r_unsafe <= 'X';
             else
-                o_sig <= '1';
+                o_sig <= r_unsafe;
                 r_unsafe <= i_sig;
             end if;
         end if;

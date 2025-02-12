@@ -48,7 +48,7 @@ begin
         o_enable => r_enable
     );
 
-    p_conv: process(i_clk, i_rst_n)
+    p_conv: process(i_clk)
     begin
         if rising_edge(i_clk) then
             if i_rst_n = '0' then

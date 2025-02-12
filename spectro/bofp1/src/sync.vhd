@@ -49,22 +49,22 @@ entity enable is
 end entity enable;
 
 architecture rtl of enable is
+    signal r_count: integer;
 begin
 
     -- Generate enable signal
     p_enable: process(i_clk) 
-        variable v_count: integer := 0;
     begin
         if rising_edge(i_clk) then
             o_enable <= '0';
+            r_count <= r_count + 1;
 
             if i_rst_n = '0' then
-                v_count := 0;
-            elsif v_count = G_CLK_DIV then
-                v_count := 0;
+                r_count <= 0;
+            elsif r_count = 0 then
                 o_enable <= '1';
-            else
-                v_count := v_count + 1;
+            elsif r_count >= G_CLK_DIV-1 then
+                r_count <= 0;
             end if;
         end if;
     end process p_enable;

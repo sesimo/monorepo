@@ -5,7 +5,11 @@ use ieee.numeric_std.all;
 
 entity tcd1304 is
     generic (
-        G_CFG_WIDTH: integer := 8
+        G_SH_CYC_NS: integer := 1000;
+        G_CLK_DATA_FREQ_DIV: integer := 4;
+
+        G_CFG_WIDTH: integer;
+        G_CLK_FREQ: integer
     );
     port (
         i_clk: in std_logic;
@@ -20,6 +24,51 @@ entity tcd1304 is
 end entity tcd1304;
 
 architecture rtl of tcd1304 is
+    constant c_sh_pulse: integer := 1_000_000_000 / G_CLK_FREQ * G_SH_CYC_NS;
+
+    signal r_icg_buf: std_logic;
+    signal r_data_enable: std_logic;
+    signal r_data_rst_n: std_logic;
 begin
+    o_pin_icg <= r_icg_buf;
+
+    -- Generate shutter signal
+    -- The integration time is determined by the periodicity of the
+    -- electronic shutter pin. The pulse width of the shutter should
+    -- always be 1000 ns.
+    u_pwm_sh: entity work.pwm(rtl) generic map(
+        G_WIDTH => G_CFG_WIDTH
+    )
+    port map(
+        i_clk => i_clk,
+        i_rst_n => i_rst_n,
+        i_period => i_shutter,
+        i_pulse => std_logic_vector(to_unsigned(c_sh_pulse, G_CFG_WIDTH)),
+        o_clk => o_pin_sh
+    );
+
+    -- Generate master clock signal
+    u_pwm_mclk: entity work.pwm(rtl) generic map(
+        G_WIDTH => G_CFG_WIDTH
+    )
+    port map(
+        i_clk => i_clk,
+        i_rst_n => i_rst_n,
+        i_period => i_clk_speed,
+        i_pulse => std_logic_vector(to_integer(i_clk_speed) / 2),
+        o_clk => o_pin_sh
+    );
+
+    u_data_enable: entity work.enable(rtl) generic map(
+        G_CLK_DIV => G_CLK_DATA_FREQ_DIV
+    )
+    port map(
+        i_clk => i_clk,
+        i_rst_n => r_data_rst_n,
+        o_clk => r_data_enable
+    );
+
+    -- Only trigger enable signals when ICG has been set high
+    r_data_rst_n <= not (i_rst_n = '0' or r_icg_buf = '0');
 
 end architecture rtl;

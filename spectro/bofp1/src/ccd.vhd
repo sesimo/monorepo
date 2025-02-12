@@ -7,6 +7,7 @@ entity tcd1304 is
     generic (
         G_SH_CYC_NS: integer := 1000;
         G_CLK_DATA_FREQ_DIV: integer := 4;
+        G_NUM_ELEMENTS: integer := 3696;
 
         G_CFG_WIDTH: integer;
         G_CLK_FREQ: integer
@@ -14,23 +15,33 @@ entity tcd1304 is
     port (
         i_clk: in std_logic;
         i_rst_n: in std_logic;
+        i_start: in std_logic;
         i_shutter: in std_logic_vector(G_CFG_WIDTH-1 downto 0);
         i_clk_speed: in std_logic_vector(G_CFG_WIDTH-1 downto 0);
 
         o_pin_sh: out std_logic;
         o_pin_icg: out std_logic;
-        o_pin_mclk: out std_logic
+        o_pin_mclk: out std_logic;
+        o_rdy: out std_logic
     );
 end entity tcd1304;
 
 architecture rtl of tcd1304 is
-    constant c_sh_pulse: integer := 1_000_000_000 / G_CLK_FREQ * G_SH_CYC_NS;
+    type t_state is (S_IDLE, S_CAPTURE);
+    signal r_state: t_state;
+
+    constant c_sh_pulse: integer := G_SH_CYC_NS / (1_000_000_000 / G_CLK_FREQ);
 
     signal r_icg_buf: std_logic;
+    signal r_mclk_buf: std_logic;
+
     signal r_data_enable: std_logic;
     signal r_data_rst_n: std_logic;
+
+    signal r_rd_count: integer;
 begin
     o_pin_icg <= r_icg_buf;
+    o_pin_mclk <= r_mclk_buf;
 
     -- Generate shutter signal
     -- The integration time is determined by the periodicity of the
@@ -55,20 +66,53 @@ begin
         i_clk => i_clk,
         i_rst_n => i_rst_n,
         i_period => i_clk_speed,
-        i_pulse => std_logic_vector(to_integer(i_clk_speed) / 2),
-        o_clk => o_pin_sh
+        i_pulse => std_logic_vector(unsigned(i_clk_speed) / 2),
+        o_clk => r_mclk_buf
     );
 
+    -- Generate enable signal at the rate of the data signal
     u_data_enable: entity work.enable(rtl) generic map(
-        G_CLK_DIV => G_CLK_DATA_FREQ_DIV
+        G_CLK_DIV => std_logic_vector(unsigned(i_clk_speed) * G_CLK_DATA_FREQ_DIV)
     )
     port map(
         i_clk => i_clk,
         i_rst_n => r_data_rst_n,
-        o_clk => r_data_enable
+        o_enable => r_data_enable
     );
 
     -- Only trigger enable signals when ICG has been set high
-    r_data_rst_n <= not (i_rst_n = '0' or r_icg_buf = '0');
+    r_data_rst_n <= '0' when (i_rst_n = '0' or r_icg_buf = '0') else '1';
+
+    p_capture: process(i_clk)
+    begin
+        if rising_edge(i_clk) then
+            if i_rst_n = '0' then
+                r_icg_buf <= '0';
+                r_state <= S_IDLE;
+                r_rd_count <= 0;
+            else
+                case r_state is
+                    when S_IDLE =>
+                        o_rdy <= '1';
+                        r_icg_buf <= '0';
+
+                        if i_start = '1' then
+                            r_state <= S_CAPTURE;
+                            o_rdy <= '0';
+                        end if;
+
+                    when S_CAPTURE =>
+                        r_icg_buf <= '1';
+
+                        if r_rd_count >= G_NUM_ELEMENTS then
+                            r_rd_count <= 0;
+                            r_state <= S_IDLE;
+                        elsif r_data_enable then
+                            r_rd_count <= r_rd_count + 1;
+                        end if;
+                end case;
+            end if;
+        end if;
+    end process p_capture;
 
 end architecture rtl;

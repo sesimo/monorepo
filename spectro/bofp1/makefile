@@ -6,7 +6,8 @@ SOURCES=src/sync.vhd \
 		src/adc.vhd  \
 		src/pwm.vhd  \
 		src/ccd.vhd  \
-		src/spi/spi_main.vhd
+		src/spi/spi_main.vhd \
+		src/spi/spi_sub.vhd
 
 GHDL_ARGS=--workdir=$(realpath build) --std=08
 

@@ -27,7 +27,7 @@ entity tcd1304 is
 end entity tcd1304;
 
 architecture rtl of tcd1304 is
-    type t_state is (S_IDLE, S_CAPTURE);
+    type t_state is (S_IDLE, S_SYNCING, S_CAPTURE);
     signal r_state: t_state;
 
     constant c_sh_pulse: integer := G_SH_CYC_NS / (1_000_000_000 / G_CLK_FREQ);
@@ -82,8 +82,8 @@ begin
         o_enable => r_data_enable
     );
 
-    -- Only trigger enable signals when ICG has been set high
-    r_data_rst_n <= '0' when (i_rst_n = '0' or r_icg_buf = '0') else '1';
+    -- Only trigger enable signals when actually capturing
+    r_data_rst_n <= '0' when (i_rst_n = '0' or r_state /= S_CAPTURE) else '1';
 
     p_capture: process(i_clk)
     begin
@@ -99,13 +99,22 @@ begin
                         r_icg_buf <= '0';
 
                         if i_start = '1' then
-                            r_state <= S_CAPTURE;
+                            r_state <= S_SYNCING;
                             o_rdy <= '0';
+                            r_icg_buf <= '1';
+                        end if;
+
+                    when S_SYNCING =>
+                        -- Use a seperate state to sync to the CCD master clock,
+                        -- that is, wait until mclk is high before continuing.
+                        -- This is done since the idle state needs to detect a
+                        -- high `i_start` on the edge of `i_clk`, but everything
+                        -- else should be synced to the mclk.
+                        if r_mclk_buf = '1' then
+                            r_state <= S_CAPTURE;
                         end if;
 
                     when S_CAPTURE =>
-                        r_icg_buf <= '1';
-
                         if r_rd_count >= G_NUM_ELEMENTS then
                             r_rd_count <= 0;
                             r_state <= S_IDLE;

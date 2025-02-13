@@ -72,10 +72,12 @@ begin
 
     -- Generate enable signal at the rate of the data signal
     u_data_enable: entity work.enable(rtl) generic map(
-        G_CLK_DIV => std_logic_vector(unsigned(i_clk_speed) * G_CLK_DATA_FREQ_DIV)
+        G_WIDTH => G_CFG_WIDTH
     )
     port map(
         i_clk => i_clk,
+        i_clk_div => std_logic_vector(
+            resize(unsigned(i_clk_speed) * G_CLK_DATA_FREQ_DIV, G_CFG_WIDTH)),
         i_rst_n => r_data_rst_n,
         o_enable => r_data_enable
     );

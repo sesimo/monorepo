@@ -39,10 +39,11 @@ use ieee.numeric_std.all;
 -- brief Enable generator
 entity enable is
     generic (
-        G_CLK_DIV: std_logic_vector := "1"
+        G_WIDTH: integer
     );
     port (
         i_clk: in std_logic;
+        i_clk_div: in std_logic_vector(G_WIDTH-1 downto 0);
         i_rst_n: in std_logic;
         o_enable: out std_logic
     );
@@ -63,7 +64,7 @@ begin
                 r_count <= 0;
             elsif r_count = 0 then
                 o_enable <= '1';
-            elsif r_count >= unsigned(G_CLK_DIV) - 1 then
+            elsif r_count >= unsigned(i_clk_div) - 1 then
                 r_count <= 0;
             end if;
         end if;

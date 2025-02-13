@@ -70,7 +70,9 @@ begin
         o_clk => r_mclk_buf
     );
 
-    -- Generate enable signal at the rate of the data signal
+    -- Generate enable signal at the rate of the data signal.
+    -- This is used to tigger sampling of the ADC, as well as incrementing
+    -- the counter in `p_capture`.
     u_data_enable: entity work.enable(rtl) generic map(
         G_WIDTH => G_CFG_WIDTH
     )

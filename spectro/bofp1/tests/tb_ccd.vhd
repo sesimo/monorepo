@@ -53,10 +53,11 @@ begin
     p_main: process
     begin
         wait until r_rst_n = '1';
+        wait for c_clk_period * 20;
         r_start <= '1';
         wait for c_clk_period;
         r_start <= '0';
-        wait for 2 ms;
+        wait until r_rdy = '1';
 
         stop;
     end process p_main;

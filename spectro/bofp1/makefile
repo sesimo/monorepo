@@ -2,7 +2,9 @@
 TARGET?=
 OPTS?="--wave=wave.ghw"
 
-SOURCES=src/sync.vhd \
+SOURCES=src/util/dff.vhd      \
+		src/util/counter.vhd  \
+		src/util/enable.vhd   \
 		src/adc.vhd  \
 		src/pwm.vhd  \
 		src/ccd.vhd  \

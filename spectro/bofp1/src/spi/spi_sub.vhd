@@ -17,16 +17,17 @@ entity spi_sub is
         i_data: in std_logic_vector(G_DATA_WIDTH-1 downto 0);
         
         i_mosi: in std_logic;
-        i_cs: in std_logic;
+        i_cs_n: in std_logic;
         o_miso: out std_logic;
 
         o_data: out std_logic_vector(G_DATA_WIDTH-1 downto 0);
+        o_rdy: out std_logic
     );
 end entity;
 
 architecture rtl of spi_sub is
-    signal r_sample: std_logic = '1';
-    signal r_shift: std_logic = '1';
+    signal r_sample: std_logic;
+    signal r_shift: std_logic;
 
     -- TODO: Move to common package
     -- Convert a boolean to std_logic '1' or '0'
@@ -40,11 +41,12 @@ architecture rtl of spi_sub is
     end function f_bool_logic;
 
     -- Sample on rising edge (mode 0 and 3, CPHA != CPOL)
-    constant c_smpl_ris: boolean := f_bool_logic(G_MODE = 0 or G_MODE = 3);
+    constant c_smpl_ris: std_logic := f_bool_logic(G_MODE = 0 or G_MODE = 3);
 begin
-    r_sample <= f_bool_logic(i_cs = '0' and i_sclk = c_smpl_ris);
-    r_shift <= f_bool_logic(i_cs = '0' and i_sclk /= c_smpl_ris);
+    r_sample <= f_bool_logic(i_cs_n = '0' and i_sclk = c_smpl_ris);
+    r_shift <= f_bool_logic(i_cs_n = '0' and i_sclk /= c_smpl_ris);
 
+    -- Read data from MOSI into o_data
     p_sample: process(i_sclk, i_arst_n)
         variable v_count: integer;
         variable v_shf_buf: std_logic_vector(G_DATA_WIDTH-1 downto 0);
@@ -53,17 +55,24 @@ begin
             v_count := 0;
             v_shf_buf := (others => 'X');
             o_data <= (others => 'X');
-        elsif i_sclk'event and r_sample then
-            v_count := v_count + 1;
-            v_shf_buf := i_mosi & v_shf_buf(v_shf_buf'high downto 1);
+            o_rdy <= '0';
+        elsif i_sclk'event then
+            o_rdy <= '0';
 
-            if v_count := G_DATA_WIDTH then
-                v_count := 0;
-                o_data <= v_shf_buf;
+            if r_sample = '1' then
+                v_count := v_count + 1;
+                v_shf_buf := i_mosi & v_shf_buf(v_shf_buf'high downto 1);
+
+                if v_count = G_DATA_WIDTH then
+                    v_count := 0;
+                    o_data <= v_shf_buf;
+                    o_rdy <= '1';
+                end if;
             end if;
         end if;
     end process p_sample;
 
+    -- Shift bits in i_data onto MISO
     p_shift: process(i_sclk, i_arst_n)
         variable v_count: integer;
         variable v_shf_buf: std_logic_vector(G_DATA_WIDTH-1 downto 0);
@@ -73,7 +82,7 @@ begin
 
             v_count := 0;
             v_shf_buf := (others => 'Z');
-        elsif i_sclk'event and r_shift then
+        elsif i_sclk'event and r_shift = '1' then
             if v_count = 0 then
                 v_shf_buf := i_data;
             end if;

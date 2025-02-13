@@ -41,9 +41,10 @@ begin
 
     -- Enable generator
     u_enable: entity work.enable(rtl) generic map(
-        G_CLK_DIV => std_logic_vector(to_unsigned(G_CLK_DIV, 8))
+        G_WIDTH => 8
     ) port map(
         i_clk => i_clk,
+        i_clk_div => std_logic_vector(to_unsigned(G_CLK_DIV, 8)),
         i_rst_n => i_rst_n,
         o_enable => r_enable
     );

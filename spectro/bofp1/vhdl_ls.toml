@@ -1,0 +1,2 @@
+[libraries]
+[worklib.files] = ["./src/**/*.vhd", "./src/*.vhd"]

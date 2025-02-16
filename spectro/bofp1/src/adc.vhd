@@ -34,7 +34,6 @@ begin
     -- Double flipflop to synchronize inputs
     u_dff_eoc: entity work.dff(rtl) port map(
         i_clk => i_clk,
-        i_rst_n => i_rst_n,
         i_sig => i_pin_eoc,
         o_sig => r_eoc
     );

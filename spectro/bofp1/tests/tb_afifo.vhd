@@ -60,14 +60,19 @@ begin
     begin
         wait until r_rst_n = '1';
         wait for c_wr_clk_period * 3;
-        r_wr_data <= "10110101";
-        r_wr_en <= '1';
-        wait for c_wr_clk_period*2;
-        r_wr_en <= '0';
-        wait until r_wr_full = '0';
-        r_wr_en <= '1';
-        wait for c_wr_clk_period;
-        r_wr_en <= '0';
+        
+        for i in 0 to 16 loop
+            if r_wr_full /= '0' then
+                wait until r_wr_full = '0';
+            end if;
+
+            r_wr_en <= '1';
+            r_wr_data <= std_logic_vector(to_unsigned(i, G_WIDTH));
+            wait for c_wr_clk_period/2;
+            r_wr_en <= '0';
+            wait for c_wr_clk_period/2;
+        end loop;
+
         wait;
     end process p_write;
 
@@ -75,10 +80,17 @@ begin
     begin
         wait until r_rst_n = '1';
         wait for c_rd_clk_period * 3;
-        wait until r_rd_empty = '0';
-        r_rd_en <= '1';
-        wait for c_rd_clk_period;
-        r_rd_en <= '0';
+        
+        for i in 0 to 16 loop
+            if r_rd_empty /= '0' then
+                wait until r_rd_empty = '0';
+            end if;
+            r_rd_en <= '1';
+            wait for c_rd_clk_period/2;
+            r_rd_en <= '0';
+            wait for c_rd_clk_period/2;
+        end loop;
+
         wait;
     end process p_read;
 

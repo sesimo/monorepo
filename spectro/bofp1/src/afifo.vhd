@@ -25,7 +25,9 @@ entity afifo is
 end entity afifo;
 
 architecture rtl of afifo is
-    constant c_bits_needed: integer := integer(ceil(log2(real(G_SIZE))));
+    -- One extra bit to keep track of the overflow. This is used to determine
+    -- whether the fifo is full.
+    constant c_bits_needed: integer := integer(ceil(log2(real(G_SIZE)))) + 1;
 
     -- Memory area for the FIFO
     subtype t_item is std_logic_vector(G_DATA_WIDTH-1 downto 0);
@@ -33,9 +35,9 @@ architecture rtl of afifo is
     signal r_mem: t_mem;
 
     -- Not subtracted 1 as we are using one extra bit to track wrapping
-    subtype t_addr is unsigned(c_bits_needed downto 0);
-    subtype t_addr_real is integer range 0 to G_SIZE;
-    subtype t_gray_addr is std_logic_vector(c_bits_needed downto 0);
+    subtype t_addr is unsigned(c_bits_needed-1 downto 0);
+    subtype t_addr_real is integer range 0 to G_SIZE-1;
+    subtype t_gray_addr is std_logic_vector(c_bits_needed-1 downto 0);
 
     -- Convert n to its equivalent in gray encoding
     function to_gray(n: t_addr) return t_gray_addr is
@@ -78,18 +80,15 @@ begin
     r_rbin_next <= r_rbin + 1 when not r_rd_empty and i_rd_en = '1' else r_rbin;
     r_wbin_next <= r_wbin + 1 when not r_wr_full and i_wr_en = '1' else r_wbin;
 
-    r_wgray_next <= to_gray(r_wbin_next);
     r_rgray_next <= to_gray(r_rbin_next);
+    r_wgray_next <= to_gray(r_wbin_next);
 
     o_rd_empty <= '1' when r_rd_empty else '0';
     o_wr_full <= '1' when r_wr_full else '0';
 
-    r_mem(r_wr_addr) <= i_wr_data when rising_edge(i_wr_clk) and i_wr_en = '1';
-    o_rd_data <= r_mem(r_rd_addr) when i_rd_en = '1';
-
     -- Cross clock domain with the write gray addr, into the reading side
     u_dff_gray_wr: entity work.cdc_vector(rtl) generic map (
-        G_WIDTH => c_bits_needed+1
+        G_WIDTH => c_bits_needed
     )
     port map(
         i_clk => i_rd_clk,
@@ -99,13 +98,27 @@ begin
 
     -- Cross clock domain with the read gray addr, into the writing side
     u_dff_gray_rd: entity work.cdc_vector(rtl) generic map (
-        G_WIDTH => c_bits_needed+1
+        G_WIDTH => c_bits_needed
     )
     port map(
         i_clk => i_wr_clk,
         i_sig => r_rgray,
         o_sig => r_rgray_cdc
     );
+
+    p_read: process(i_rd_clk)
+    begin
+        if rising_edge(i_rd_clk) and i_rd_en = '1' then
+            o_rd_data <= r_mem(r_rd_addr);
+        end if;
+    end process p_read;
+
+    p_write: process(i_wr_clk)
+    begin
+        if rising_edge(i_wr_clk) and i_wr_en = '1' then
+            r_mem(r_wr_addr) <= i_wr_data;
+        end if;
+    end process p_write;
 
     -- Update read address to next
     p_rd_addr: process(i_rd_clk, i_rd_rst_n)
@@ -114,7 +127,7 @@ begin
             r_rbin <= (others => '0');
             r_rgray <= (others => '0');
             r_rd_addr <= 0;
-        elsif rising_edge(i_rd_clk) and i_rd_en = '1' then
+        elsif rising_edge(i_rd_clk) then
             r_rbin <= r_rbin_next;
             r_rgray <= r_rgray_next;
             r_rd_addr <= addr_real(r_rbin_next);
@@ -128,7 +141,7 @@ begin
             r_wbin <= (others => '0');
             r_wgray <= (others => '0');
             r_wr_addr <= 0;
-        elsif rising_edge(i_wr_clk) and i_wr_en = '1' then
+        elsif rising_edge(i_wr_clk) then
             r_wbin <= r_wbin_next;
             r_wgray <= r_wgray_next;
             r_wr_addr <= addr_real(r_wbin_next);
@@ -146,7 +159,7 @@ begin
             if i_rd_rst_n = '0' then
                 r_rd_empty <= true;
             else 
-                r_rd_empty <= r_rgray_next = r_wgray;
+                r_rd_empty <= r_rgray_next = r_wgray_cdc;
             end if;
         end if;
     end process p_empty;
@@ -158,8 +171,8 @@ begin
                 r_wr_full <= false;
             else 
                 r_wr_full <= r_wgray_next = (
-                    not r_rgray(r_rgray'high downto r_rgray'high-1) &
-                    r_rgray(r_rgray'high-2 downto 0)
+                    not r_rgray_cdc(r_rgray_cdc'high downto r_rgray_cdc'high-1)
+                    & r_rgray_cdc(r_rgray_cdc'high-2 downto 0)
                 );
             end if;
         end if;

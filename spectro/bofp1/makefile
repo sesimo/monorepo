@@ -1,6 +1,7 @@
 
 TARGET?=
 OPTS?="--wave=wave.ghw"
+GHDL?=ghdl-mcode
 
 SOURCES=src/util/dff.vhd      \
 		src/util/counter.vhd  \
@@ -18,11 +19,11 @@ target_name=$(shell basename $(1) | cut -d"." -f1)
 all: build/tb_adc.o
 
 build/%.o: $(SOURCES) tests/%.vhd
-	ghdl -a $(GHDL_ARGS) $^
-	@cd build && ghdl -e $(GHDL_ARGS) $(call target_name, $@)
+	$(GHDL) -a $(GHDL_ARGS) $^
+	@cd build && $(GHDL) -e $(GHDL_ARGS) $(call target_name, $@)
 
 run: $(TARGET)
-	@cd build && ghdl -r $(GHDL_ARGS) $(call target_name, $^) $(OPTS)
+	@cd build && $(GHDL) -r $(GHDL_ARGS) $(call target_name, $^) $(OPTS)
 
 view_wave: build/wave.ghw
 	gtkwave $^

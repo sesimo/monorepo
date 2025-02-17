@@ -4,6 +4,7 @@ OPTS?="--wave=wave.ghw"
 GHDL?=ghdl-mcode
 
 SOURCES=src/util/dff.vhd      \
+		src/util/cdc_vector.vhd \
 		src/util/counter.vhd  \
 		src/util/enable.vhd   \
 		src/adc.vhd  \

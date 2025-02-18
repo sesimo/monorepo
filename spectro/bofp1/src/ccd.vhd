@@ -22,7 +22,7 @@ entity tcd1304 is
         o_pin_sh: out std_logic;
         o_pin_icg: out std_logic;
         o_pin_mclk: out std_logic;
-        o_rdy: out std_logic
+        o_data_rdy: out std_logic
     );
 end entity tcd1304;
 
@@ -84,6 +84,8 @@ begin
         o_enable => r_data_enable
     );
 
+    o_data_rdy <= r_data_enable;
+
     -- Only trigger enable signals when actually capturing
     r_data_rst_n <= '0' when (i_rst_n = '0' or r_state /= S_CAPTURE) else '1';
 
@@ -97,12 +99,10 @@ begin
             else
                 case r_state is
                     when S_IDLE =>
-                        o_rdy <= '1';
                         r_icg_buf <= '0';
 
                         if i_start = '1' then
                             r_state <= S_SYNCING;
-                            o_rdy <= '0';
                             r_icg_buf <= '1';
                         end if;
 

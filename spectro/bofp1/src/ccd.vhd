@@ -16,8 +16,8 @@ entity tcd1304 is
         i_clk: in std_logic;
         i_rst_n: in std_logic;
         i_start: in std_logic;
-        i_shutter: in std_logic_vector(G_CFG_WIDTH-1 downto 0);
-        i_clk_speed: in std_logic_vector(G_CFG_WIDTH-1 downto 0);
+        i_sh_div: in std_logic_vector(G_CFG_WIDTH-1 downto 0);
+        i_mclk_div: in std_logic_vector(G_CFG_WIDTH-1 downto 0);
 
         o_pin_sh: out std_logic;
         o_pin_icg: out std_logic;
@@ -53,7 +53,7 @@ begin
     port map(
         i_clk => i_clk,
         i_rst_n => i_rst_n,
-        i_period => i_shutter,
+        i_period => i_sh_div,
         i_pulse => std_logic_vector(to_unsigned(c_sh_pulse, G_CFG_WIDTH)),
         o_clk => o_pin_sh
     );
@@ -65,8 +65,8 @@ begin
     port map(
         i_clk => i_clk,
         i_rst_n => i_rst_n,
-        i_period => i_clk_speed,
-        i_pulse => std_logic_vector(unsigned(i_clk_speed) / 2),
+        i_period => i_mclk_div,
+        i_pulse => std_logic_vector(unsigned(i_mclk_div) / 2),
         o_clk => r_mclk_buf
     );
 
@@ -79,7 +79,7 @@ begin
     port map(
         i_clk => i_clk,
         i_clk_div => std_logic_vector(
-            resize(unsigned(i_clk_speed) * G_CLK_DATA_FREQ_DIV, G_CFG_WIDTH)),
+            resize(unsigned(i_mclk_div) * G_CLK_DATA_FREQ_DIV, G_CFG_WIDTH)),
         i_rst_n => r_data_rst_n,
         o_enable => r_data_enable
     );

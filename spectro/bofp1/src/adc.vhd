@@ -17,7 +17,7 @@ entity ads8329 is
         i_pin_eoc: in std_logic;
         o_pin_stconv: out std_logic;
 
-        o_spi_enable: out std_logic
+        o_rd_en: out std_logic
     );
 end entity ads8329;
 
@@ -53,7 +53,7 @@ begin
                 r_state <= S_IDLE;
                 
                 o_pin_stconv <= '0';
-                o_spi_enable <= '0';
+                o_rd_en <= '0';
             elsif r_enable = '1' then
                 o_pin_stconv <= '0';
 
@@ -68,7 +68,7 @@ begin
                     when S_CONVERTING =>
                         -- Started, wait for conversion to complete
                         if r_eoc = '1' then
-                            o_spi_enable <= '1';
+                            o_rd_en <= '1';
 
                             r_state <= S_IDLE;
                         end if;

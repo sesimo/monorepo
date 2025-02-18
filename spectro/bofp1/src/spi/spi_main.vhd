@@ -13,7 +13,7 @@ entity spi_main is
     port (
         i_clk: in std_logic;
         i_rst_n: in std_logic;
-        i_start: in std_logic;
+        i_rd_en: in std_logic;
         i_data: in std_logic_vector(G_DATA_WIDTH-1 downto 0);
 
         i_miso: in std_logic;
@@ -21,7 +21,7 @@ entity spi_main is
         o_sclk: out std_logic;
         
         o_data: out std_logic_vector(G_DATA_WIDTH-1 downto 0);
-        o_busy: out std_logic
+        o_rd_en: out std_logic
     );
 end entity spi_main;
 
@@ -52,7 +52,6 @@ architecture rtl of spi_main is
     constant c_smpl_ris: std_logic := f_bool_logic(G_MODE = 0 or G_MODE = 3);
 begin
     o_sclk <= r_sclk_buf;
-    o_busy <= f_bool_logic(r_running);
 
     r_running <= r_start_ext = '1' or r_shifting or r_sampling;
 
@@ -68,6 +67,27 @@ begin
         o_clk => r_sclk_buf
     );
 
+    -- Generate read enable signal for one clock cycle
+    p_rd_en: process(i_clk)
+        variable v_started: boolean;
+    begin
+        if rising_edge(i_clk) then
+            if i_rst_n = '0' then
+                o_rd_en <= '0';
+                v_started := false;
+            else
+                o_rd_en <= '0';
+
+                if v_started and not r_running then
+                    o_rd_en <= '1';
+                    v_started := false;
+                elsif r_start_ext = '1' then
+                    v_started := true;
+                end if;
+            end if;
+        end if;
+    end process p_rd_en;
+
     -- Detect the start condition and prolong it for one SCLK cycle
     p_detect_start: process(i_clk)
     begin
@@ -75,7 +95,7 @@ begin
             if i_rst_n = '0' then
                 r_start_ext <= '0';
             else
-                if i_start = '1' then
+                if i_rd_en = '1' then
                     r_start_ext <= '1';
                 elsif r_sclk_buf = '1' then
                     -- Clear at next high edge of SCLK

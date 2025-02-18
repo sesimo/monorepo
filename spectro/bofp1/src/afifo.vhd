@@ -1,3 +1,8 @@
+-- Asynchronous FIFO implementation, based on Clifford E. Cummings' paper:
+-- http://www.sunburst-design.com/papers/CummingsSNUG2002SJ_FIFO1.pdf
+-- This FIFO is safe to use across two seperate clock domains, one for
+-- writing and another for reading. For details on implementation see
+-- Clifford's paper.
 
 library ieee;
 use ieee.std_logic_1164.all;
@@ -31,7 +36,7 @@ architecture rtl of afifo is
 
     -- Memory area for the FIFO
     subtype t_item is std_logic_vector(G_DATA_WIDTH-1 downto 0);
-    type t_mem is array(0 to G_SIZE) of t_item;
+    type t_mem is array(0 to G_SIZE-1) of t_item;
     signal r_mem: t_mem;
 
     -- Not subtracted 1 as we are using one extra bit to track wrapping

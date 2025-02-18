@@ -86,9 +86,10 @@ begin
                 wait until r_rd_empty = '0';
             end if;
             r_rd_en <= '1';
-            wait for c_rd_clk_period/2;
+            wait for c_rd_clk_period;
             r_rd_en <= '0';
-            wait for c_rd_clk_period/2;
+            -- Tiny delay so that rd_empty is set on next iteration
+            wait for c_rd_clk_period * 0.05;
         end loop;
 
         wait;

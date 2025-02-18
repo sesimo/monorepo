@@ -28,6 +28,8 @@ end entity;
 architecture rtl of spi_sub is
     signal r_sample: std_logic;
     signal r_shift: std_logic;
+    
+    signal r_arst_n: std_logic;
 
     -- TODO: Move to common package
     -- Convert a boolean to std_logic '1' or '0'
@@ -46,12 +48,22 @@ begin
     r_sample <= f_bool_logic(i_cs_n = '0' and i_sclk = c_smpl_ris);
     r_shift <= f_bool_logic(i_cs_n = '0' and i_sclk /= c_smpl_ris);
 
+    -- Asynchronouos assertion of reset, synchronous release
+    p_reset: process(i_sclk, i_arst_n)
+    begin
+        if i_arst_n = '0' then
+            r_arst_n <= '0';
+        elsif rising_edge(i_sclk) then
+            r_arst_n <= '1';
+        end if;
+    end process p_reset;
+
     -- Read data from MOSI into o_data
-    p_sample: process(i_sclk, i_arst_n)
+    p_sample: process(i_sclk, r_arst_n)
         variable v_count: integer;
         variable v_shf_buf: std_logic_vector(G_DATA_WIDTH-1 downto 0);
     begin
-        if i_arst_n = '0' then
+        if r_arst_n = '0' then
             v_count := 0;
             v_shf_buf := (others => 'X');
             o_data <= (others => 'X');
@@ -73,11 +85,11 @@ begin
     end process p_sample;
 
     -- Shift bits in i_data onto MISO
-    p_shift: process(i_sclk, i_arst_n)
+    p_shift: process(i_sclk, r_arst_n)
         variable v_count: integer;
         variable v_shf_buf: std_logic_vector(G_DATA_WIDTH-1 downto 0);
     begin
-        if i_arst_n = '0' then
+        if r_arst_n = '0' then
             o_miso <= 'Z';
 
             v_count := 0;

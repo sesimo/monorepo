@@ -7,7 +7,6 @@ use std.env.stop;
 
 entity tb_adc is
     generic (
-        G_RESOLUTION: integer := 16;
         G_CLK_FREQ: integer := 100_000_000;
         G_CLK_DIV: integer := 10
     );
@@ -17,13 +16,10 @@ architecture bhv of tb_adc is
     signal r_clk: std_logic := '0';
     signal r_rst_n: std_logic := '0';
     signal r_start: std_logic := '0';
-    signal r_busy: std_logic := '0';
 
     signal r_stconv: std_logic := '0';
     signal r_eoc: std_logic := '0';
 
-    signal r_spi_enable: std_logic := '0';
-    signal r_spi_rdy: std_logic := '0';
     signal r_rd_en: std_logic;
 
     constant c_clk_period: time := (1.0 / real(G_CLK_FREQ)) * (1 sec);

@@ -17,15 +17,24 @@ entity enable is
 end entity enable;
 
 architecture rtl of enable is
+    signal r_count: integer;
 begin
-    u_counter: entity work.counter(rtl) generic map (
-        G_WIDTH => G_WIDTH
-    )
-    port map(
-        i_clk => i_clk,
-        i_start => '1',
-        i_cyc_cnt => i_clk_div,
-        i_rst_n => i_rst_n,
-        o_int => o_enable
-    );
+
+    -- Generate enable signal
+    p_enable: process(i_clk) 
+    begin
+        if rising_edge(i_clk) then
+            o_enable <= '0';
+            r_count <= r_count + 1;
+
+            if i_rst_n = '0' then
+                r_count <= 0;
+            elsif r_count = 0 then
+                o_enable <= '1';
+            elsif r_count >= unsigned(i_clk_div) - 1 then
+                r_count <= 0;
+            end if;
+        end if;
+    end process p_enable;
+
 end architecture rtl;

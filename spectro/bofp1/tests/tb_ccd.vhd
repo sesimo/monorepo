@@ -21,7 +21,7 @@ architecture bhv of tb_ccd is
     signal r_clk: std_logic := '0';
     signal r_rst_n: std_logic := '0';
 
-    pure function calc_speed(freq_hz: integer) return std_logic_vector is
+    function calc_speed(freq_hz: integer) return std_logic_vector is
         variable v_scale: integer;
     begin
         v_scale := G_CLK_FREQ / freq_hz;

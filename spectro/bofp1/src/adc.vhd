@@ -53,25 +53,29 @@ begin
                 
                 o_pin_stconv <= '0';
                 o_rd_en <= '0';
-            elsif r_enable = '1' then
-                o_pin_stconv <= '0';
+            else 
+                o_rd_en <= '0';
 
-                case r_state is
-                    when S_IDLE =>
-                        -- Wait for start signal
-                        if i_start = '1' then
-                            o_pin_stconv <= '1';
+                if r_enable = '1' then
+                    o_pin_stconv <= '0';
 
-                            r_state <= S_CONVERTING;
-                        end if;
-                    when S_CONVERTING =>
-                        -- Started, wait for conversion to complete
-                        if r_eoc = '1' then
-                            o_rd_en <= '1';
+                    case r_state is
+                        when S_IDLE =>
+                            -- Wait for start signal
+                            if i_start = '1' then
+                                o_pin_stconv <= '1';
 
-                            r_state <= S_IDLE;
-                        end if;
-                end case;
+                                r_state <= S_CONVERTING;
+                            end if;
+                        when S_CONVERTING =>
+                            -- Started, wait for conversion to complete
+                            if r_eoc = '1' then
+                                o_rd_en <= '1';
+
+                                r_state <= S_IDLE;
+                            end if;
+                    end case;
+                end if;
             end if;
         end if;
     end process p_conv;

@@ -32,13 +32,12 @@ begin
                 o_int <= '0';
 
                 if r_count = 0 then
-                    o_int <= '1';
-
                     -- Only restart when i_start is high
                     if i_start = '0' then
                         r_count <= 0;
                     end if;
                 elsif r_count >= unsigned(i_cyc_cnt) - 1 then
+                    o_int <= '1';
                     r_count <= 0;
                 end if;
             end if;

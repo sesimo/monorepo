@@ -7,7 +7,7 @@ entity tcd1304 is
     generic (
         G_SH_CYC_NS: integer := 1000;
         G_CLK_DATA_FREQ_DIV: integer := 4;
-        G_NUM_ELEMENTS: integer := 3696;
+        G_NUM_ELEMENTS: integer := 3694;
 
         G_CFG_WIDTH: integer;
         G_CLK_FREQ: integer

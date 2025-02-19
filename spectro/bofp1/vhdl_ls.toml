@@ -1,5 +1,7 @@
 [libraries]
 worklib.files = [
+    "./tests/*.vhd",
+    "./tests/**/*.vhd",
     "./src/*.vhd",
     "./src/**/*.vhd",
 ]

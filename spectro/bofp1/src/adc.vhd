@@ -5,7 +5,6 @@ use ieee.numeric_std.all;
 
 entity ads8329 is
     generic (
-        G_RESOLUTION: integer := 16;
         G_CLK_DIV: integer
     );
 

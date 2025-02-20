@@ -19,7 +19,6 @@ entity tb_spi_sub is
 end entity tb_spi_sub;
 
 architecture bhv of tb_spi_sub is
-    signal r_rst_n: std_logic := '0';
     signal r_wr_data: std_logic_vector(G_DATA_WIDTH-1 downto 0) := x"ABC0";
     signal r_rd_data: std_logic_vector(G_DATA_WIDTH-1 downto 0);
 
@@ -41,7 +40,6 @@ begin
     )
     port map(
         i_sclk => r_spi_if.sclk,
-        i_arst_n => r_rst_n,
         i_data => r_wr_data,
 
         i_mosi => r_spi_if.mosi,
@@ -71,11 +69,6 @@ begin
     end process p_recv_reg;
 
     p_main: process
-        procedure release_reset is
-        begin
-            r_rst_n <= '1';
-        end procedure release_reset;
-
         variable v_data: std_logic_vector(15 downto 0);
         variable v_data32: std_logic_vector(31 downto 0);
     begin
@@ -94,12 +87,11 @@ begin
             config => r_spi_conf,
             master_mode => true
         );
+        wait for 1 ps;
 
         log(ID_LOG_HDR, "Start simulation SPI sub", c_scope);
         log(ID_LOG_HDR, "Bit time: " & time'image(r_spi_conf.spi_bit_time), c_scope);
         ------------------------------------------------------------------------
-        release_reset;
-        wait for 1 ps;
 
         -- Check that the SPI implementation returns the correct result
         spi_master_transmit_and_receive(

@@ -15,7 +15,9 @@ SOURCES=src/util/dff.vhd      \
 		src/spi/spi_sub.vhd  \
 		src/ctrl.vhd
 
-GHDL_ARGS=--workdir=$(realpath build) --std=08
+GHDL_ARGS=--workdir=$(realpath build) --std=08 -frelaxed-rules \
+		  -P$(shell pwd)/build/ghdl
+GHDL_RUNARGS=--assert-level=failure
 
 target_name=$(shell basename $(1) | cut -d"." -f1)
 
@@ -26,7 +28,7 @@ build/%.o: $(SOURCES) tests/%.vhd
 	@cd build && $(GHDL) -e $(GHDL_ARGS) $(call target_name, $@)
 
 run: $(TARGET)
-	@cd build && $(GHDL) -r $(GHDL_ARGS) $(call target_name, $^) $(OPTS)
+	@cd build && $(GHDL) -r $(GHDL_ARGS) $(call target_name, $^) $(GHDL_RUNARGS) $(OPTS)
 
 view_wave: build/wave.ghw
 	gtkwave $^

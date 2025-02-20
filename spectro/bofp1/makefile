@@ -11,6 +11,7 @@ SOURCES=src/util/dff.vhd      \
 		src/adc.vhd  \
 		src/pwm.vhd  \
 		src/ccd.vhd  \
+		src/spi/spi_common.vhd \
 		src/spi/spi_main.vhd \
 		src/spi/spi_sub.vhd  \
 		src/ctrl.vhd

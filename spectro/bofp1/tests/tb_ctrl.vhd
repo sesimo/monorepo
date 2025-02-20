@@ -41,7 +41,7 @@ begin
     r_sclk <= not r_sclk after c_sclk_period / 2;
     r_rst_n <= '1' after c_clk_period * 2;
 
-    u_ctrl: entity work.ctrl generic map(
+    u_ctrl: entity work.ctrl(behaviour) generic map(
         G_CTRL_WIDTH => G_CTRL_WIDTH
     )
     port map(

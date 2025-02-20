@@ -13,7 +13,7 @@ entity spi_sub is
     );
     port (
         i_sclk: in std_logic;
-        i_arst_n: in std_logic;
+        i_arst_n: in std_logic; 
         i_data: in std_logic_vector(G_DATA_WIDTH-1 downto 0);
         
         i_mosi: in std_logic;
@@ -26,83 +26,92 @@ entity spi_sub is
 end entity;
 
 architecture rtl of spi_sub is
-    signal r_sample: std_logic;
-    signal r_shift: std_logic;
-    
-    signal r_arst_n: std_logic;
-
-    -- TODO: Move to common package
-    -- Convert a boolean to std_logic '1' or '0'
-    function f_bool_logic(b: in boolean) return std_logic is
-    begin
-        if b then
-            return '1';
-        end if;
-
-        return '0';
-    end function f_bool_logic;
+    signal r_arst: boolean;
 
     -- Sample on rising edge (mode 0 and 3, CPHA != CPOL)
-    constant c_smpl_ris: std_logic := f_bool_logic(G_MODE = 0 or G_MODE = 3);
+    constant c_smpl_ris: boolean := G_MODE = 0 or G_MODE = 3;
 begin
-    r_sample <= f_bool_logic(i_cs_n = '0' and i_sclk = c_smpl_ris);
-    r_shift <= f_bool_logic(i_cs_n = '0' and i_sclk /= c_smpl_ris);
-
-    -- Asynchronouos assertion of reset, synchronous release
-    p_reset: process(i_sclk, i_arst_n)
-    begin
-        if i_arst_n = '0' then
-            r_arst_n <= '0';
-        elsif rising_edge(i_sclk) then
-            r_arst_n <= '1';
-        end if;
-    end process p_reset;
+    -- When a reset occurs, assert it asynchronously but release it
+    -- synchronously with the CS line. This should give some safety
+    -- as SCLK is assumed to arrive slightly later than CS line. The reason
+    -- SCLK is not used to release the reset is because the first edge
+    -- of the SCLK must be used for the transmission -- which means that
+    -- in order to wait for a reset to be released, we would miss the
+    -- first cycle.
+    r_arst <= (i_arst_n = '0' or r_arst) and i_cs_n /= '0';
 
     -- Read data from MOSI into o_data
-    p_sample: process(i_sclk, r_arst_n)
+    p_sample: process(i_sclk, r_arst)
         variable v_count: integer;
         variable v_shf_buf: std_logic_vector(G_DATA_WIDTH-1 downto 0);
+
+        -- Check whether we should sample or not. This is done when the
+        -- clk is at the edge configured by the SPI mode
+        impure function should_sample(signal clk: std_logic) return boolean is
+            variable v_edge: boolean;
+        begin
+            if c_smpl_ris then
+                v_edge := rising_edge(clk);
+            else
+                v_edge := falling_edge(clk);
+            end if;
+
+            return i_cs_n = '0' and v_edge;
+        end function;
     begin
-        if r_arst_n = '0' then
+        if r_arst then
             v_count := 0;
             v_shf_buf := (others => 'X');
             o_data <= (others => 'X');
             o_rdy <= '0';
-        elsif i_sclk'event then
+        elsif should_sample(i_sclk) then
             o_rdy <= '0';
 
-            if r_sample = '1' then
-                v_count := v_count + 1;
-                v_shf_buf := i_mosi & v_shf_buf(v_shf_buf'high downto 1);
+            v_count := v_count + 1;
+            v_shf_buf := v_shf_buf(v_shf_buf'high-1 downto 0) & i_mosi;
 
-                if v_count = G_DATA_WIDTH then
-                    v_count := 0;
-                    o_data <= v_shf_buf;
-                    o_rdy <= '1';
-                end if;
+            if v_count >= G_DATA_WIDTH then
+                v_count := 0;
+                o_data <= v_shf_buf;
+                o_rdy <= '1';
             end if;
         end if;
     end process p_sample;
 
     -- Shift bits in i_data onto MISO
-    p_shift: process(i_sclk, r_arst_n)
+    p_shift: process(i_sclk, r_arst)
         variable v_count: integer;
         variable v_shf_buf: std_logic_vector(G_DATA_WIDTH-1 downto 0);
+
+        -- Check whether we should shift or not. This is done when the
+        -- clk is at the edge configured by the SPI mode
+        impure function should_shift(signal clk: std_logic) return boolean is
+            variable v_edge: boolean;
+        begin
+            if c_smpl_ris then
+                v_edge := falling_edge(clk);
+            else
+                v_edge := rising_edge(clk);
+            end if;
+
+            return i_cs_n = '0' and v_edge;
+
+        end function;
     begin
-        if r_arst_n = '0' then
+        if r_arst then
             o_miso <= 'Z';
 
             v_count := 0;
             v_shf_buf := (others => 'Z');
-        elsif i_sclk'event and r_shift = '1' then
+        elsif should_shift(i_sclk) then
             if v_count = 0 then
                 v_shf_buf := i_data;
             end if;
 
             v_count := v_count + 1;
 
-            o_miso <= v_shf_buf(0);
-            v_shf_buf := "Z" & v_shf_buf(v_shf_buf'high downto 1);
+            o_miso <= v_shf_buf(v_shf_buf'high);
+            v_shf_buf := v_shf_buf(v_shf_buf'high-1 downto 0) & "Z";
 
             if v_count >= G_DATA_WIDTH then
                 v_count := 0;

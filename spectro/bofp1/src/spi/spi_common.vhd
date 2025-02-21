@@ -32,7 +32,7 @@ begin
 
     -- Shift data out on `o_out`
     p_shift: process(i_sclk, i_cs_n)
-        variable v_shf_buf: std_logic_vector(G_DATA_WIDTH-1 downto 0);
+        variable v_buf: std_logic_vector(G_DATA_WIDTH-1 downto 0);
         variable v_count: integer;
 
         impure function should_shift(signal clk: std_logic) return boolean is
@@ -49,13 +49,11 @@ begin
             o_out <= 'Z';
         elsif should_shift(i_sclk) then
             if v_count = 0 then
-                v_shf_buf := i_data;
+                v_buf := i_data;
             end if;
 
+            o_out <= v_buf(v_buf'high - v_count);
             v_count := v_count + 1;
-
-            o_out <= v_shf_buf(v_shf_buf'high);
-            v_shf_buf := v_shf_buf(v_shf_buf'high-1 downto 0) & "Z";
 
             if v_count >= G_DATA_WIDTH then
                 v_count := 0;

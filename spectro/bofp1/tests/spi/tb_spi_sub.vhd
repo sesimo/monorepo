@@ -53,6 +53,7 @@ begin
     p_recv_reg: process
     begin
         wait until r_rdy = '1';
+        wait for 1 ps;
 
         log(ID_LOG_HDR, to_string(r_rd_data), c_scope);
 
@@ -110,7 +111,10 @@ begin
             r_spi_if,
             config => r_spi_conf
         );
-        check_value(v_data32(15 downto 0), x"DEA3", ERROR, "TX known");
+        check_value(
+            v_data32(15 downto 0), x"DEA3", ERROR,
+            "Received response of TX of known sequence"
+        );
 
         -- End simulation
         ------------------------------------------------------------------------

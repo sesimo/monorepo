@@ -16,14 +16,19 @@ entity spi_common is
 
         i_data: in std_logic_vector(G_DATA_WIDTH-1 downto 0);
         o_data: out std_logic_vector(G_DATA_WIDTH-1 downto 0);
+        o_data_shf: out std_logic_vector(G_DATA_WIDTH-1 downto 0);
 
         o_rdy: out std_logic
     );
 end entity;
 
 architecture rtl of spi_common is
+    signal r_sample_shf: std_logic_vector(G_DATA_WIDTH-1 downto 0);
+
     constant c_sample_rising: boolean := G_MODE = 0 or G_MODE = 3;
 begin
+    o_data_shf <= r_sample_shf;
+    o_data <= r_sample_shf when o_rdy = '1';
 
     -- Shift data out on `o_out`
     p_shift: process(i_sclk, i_cs_n)
@@ -60,7 +65,6 @@ begin
 
     -- Sample data and place it in the buffer. This notifies in `o_rdy`
     p_sample: process(i_sclk, i_cs_n)
-        variable v_shf_buf: std_logic_vector(G_DATA_WIDTH-1 downto 0);
         variable v_count: integer;
 
         impure function should_sample(signal clk: std_logic) return boolean is
@@ -78,12 +82,11 @@ begin
         elsif should_sample(i_sclk) then
             o_rdy <= '0';
 
+            r_sample_shf(r_sample_shf'high - v_count) <= i_in;
             v_count := v_count + 1;
-            v_shf_buf := v_shf_buf(v_shf_buf'high-1 downto 0) & i_in;
 
             if v_count >= G_DATA_WIDTH then
                 v_count := 0;
-                o_data <= v_shf_buf;
                 o_rdy <= '1';
             end if;
         end if;

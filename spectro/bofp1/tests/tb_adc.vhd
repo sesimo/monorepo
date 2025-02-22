@@ -7,26 +7,24 @@ use std.env.stop;
 
 entity tb_adc is
     generic (
-        G_CLK_FREQ: integer := 100_000_000;
-        G_CLK_DIV: integer := 10
+        G_CLK_FREQ: integer := 100_000_000
     );
 end entity tb_adc;
 
 architecture bhv of tb_adc is
     signal r_clk: std_logic := '0';
     signal r_rst_n: std_logic := '0';
-    signal r_start: std_logic := '0';
+    signal r_start: std_logic;
 
-    signal r_stconv: std_logic := '0';
-    signal r_eoc: std_logic := '0';
+    signal r_stconv: std_logic;
+    signal r_eoc: std_logic;
 
     signal r_rd_en: std_logic;
 
     constant c_clk_period: time := (1.0 / real(G_CLK_FREQ)) * (1 sec);
-    constant c_mod_period: time := c_clk_period * G_CLK_DIV;
 begin
     u_adc: entity work.ads8329(rtl) generic map(
-        G_CLK_DIV => G_CLK_DIV
+        G_STCONV_HOLD_CYC => 10
     )
     port map(
         i_clk => r_clk,
@@ -58,6 +56,7 @@ begin
     p_convert: process
     begin
         if r_rst_n = '0' then
+            r_eoc <= '0';
             wait until r_rst_n <= '1';
         end if;
 
@@ -71,6 +70,7 @@ begin
 
     p_main: process
     begin
+        r_start <= '0';
         wait until r_rst_n = '1';
 
         for i in 0 to 1 loop
@@ -78,7 +78,7 @@ begin
             report "STconv should be low" severity failure;
             r_start <= '1';
 
-            wait until r_stconv = '1' for c_mod_period*1.5;
+            wait for c_clk_period*1.5;
             assert r_stconv = '1'
             report "STconv should be high" severity failure;
             r_start <= '0';
@@ -95,7 +95,8 @@ begin
             assert r_rd_en = '0'
             report "RD en should be kept low" severity failure;
 
-            wait until r_rd_en = '1' for c_mod_period;
+            -- EOC needs to be passed through CDC, so this takes 3 cycles
+            wait until r_rd_en = '1' for c_clk_period * 3;
             assert r_rd_en = '1'
             report "RD en should be set high" severity failure;
 
@@ -103,7 +104,7 @@ begin
             assert r_rd_en = '0'
             report "RD en should have been cleared" severity failure;
 
-            wait for c_mod_period;
+            wait for c_clk_period;
         end loop;
 
         stop;

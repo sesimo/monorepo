@@ -20,7 +20,8 @@ entity spi_sub is
         o_miso: out std_logic;
 
         o_data: out std_logic_vector(G_DATA_WIDTH-1 downto 0);
-        o_rdy: out std_logic
+        o_sample_done: out std_logic;
+        o_shift_done: out std_logic
     );
 end entity;
 
@@ -42,7 +43,8 @@ begin
             i_data => i_data,
             o_data => o_data,
 
-            o_rdy => o_rdy
+            o_sample_done => o_sample_done,
+            o_shift_done => o_shift_done
         );
 
 end architecture;

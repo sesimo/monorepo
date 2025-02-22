@@ -47,7 +47,7 @@ begin
         o_miso => r_spi_if.miso,
 
         o_data => r_rd_data,
-        o_rdy => r_rdy
+        o_sample_done => r_rdy
     );
 
     p_recv_reg: process

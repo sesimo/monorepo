@@ -18,7 +18,8 @@ entity spi_common is
         o_data: out std_logic_vector(G_DATA_WIDTH-1 downto 0);
         o_data_shf: out std_logic_vector(G_DATA_WIDTH-1 downto 0);
 
-        o_rdy: out std_logic
+        o_sample_done: inout std_logic;
+        o_shift_done: inout std_logic
     );
 end entity;
 
@@ -28,7 +29,7 @@ architecture rtl of spi_common is
     constant c_sample_rising: boolean := G_MODE = 0 or G_MODE = 3;
 begin
     o_data_shf <= r_sample_shf;
-    o_data <= r_sample_shf when o_rdy = '1';
+    o_data <= r_sample_shf when o_sample_done = '1';
 
     -- Shift data out on `o_out`
     p_shift: process(i_sclk, i_cs_n)
@@ -47,7 +48,10 @@ begin
         if i_cs_n /= '0' then
             v_count := 0;
             o_out <= 'Z';
+            o_shift_done <= '0';
         elsif should_shift(i_sclk) then
+            o_shift_done <= '0';
+
             if v_count = 0 then
                 v_buf := i_data;
             end if;
@@ -57,6 +61,7 @@ begin
 
             if v_count >= G_DATA_WIDTH then
                 v_count := 0;
+                o_shift_done <= '1';
             end if;
         end if;
     end process p_shift;
@@ -76,16 +81,16 @@ begin
     begin
         if i_cs_n /= '0' then
             v_count := 0;
-            o_rdy <= '0';
+            o_sample_done <= '0';
         elsif should_sample(i_sclk) then
-            o_rdy <= '0';
+            o_sample_done <= '0';
 
             r_sample_shf(r_sample_shf'high - v_count) <= i_in;
             v_count := v_count + 1;
 
             if v_count >= G_DATA_WIDTH then
                 v_count := 0;
-                o_rdy <= '1';
+                o_sample_done <= '1';
             end if;
         end if;
     end process p_sample;

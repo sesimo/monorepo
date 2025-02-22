@@ -21,7 +21,7 @@ end entity fifo_ctrl;
 
 architecture bhv of fifo_ctrl is
 begin
-    u_fifo: entity work.fifo_common
+    u_fifo: entity work.fifo_common(bhv)
         generic map(
             G_DATA_WIDTH => 16,
             G_SIZE => 16

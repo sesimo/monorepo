@@ -5,7 +5,7 @@ use ieee.numeric_std.all;
 
 entity ads8329 is
     generic (
-        G_CLK_DIV: integer
+        G_STCONV_HOLD_CYC: integer := 10
     );
 
     port (
@@ -14,7 +14,7 @@ entity ads8329 is
         i_start: in std_logic;
 
         i_pin_eoc: in std_logic;
-        o_pin_stconv: out std_logic;
+        o_pin_stconv: inout std_logic;
 
         o_rd_en: out std_logic
     );
@@ -24,26 +24,48 @@ architecture rtl of ads8329 is
     type t_state is (S_IDLE, S_CONVERTING);
     signal r_state: t_state;
 
-    signal r_enable: std_logic;
+    signal r_stconv: std_logic;
+    signal r_stconv_fall: std_logic;
 
     signal r_eoc: std_logic;
+    signal r_cdc_eoc: std_logic;
 begin
-    -- Double flipflop to synchronize inputs
-    u_dff_eoc: entity work.dff(rtl) port map(
-        i_clk => i_clk,
-        i_sig => i_pin_eoc,
-        o_sig => r_eoc
-    );
+    o_pin_stconv <= '1' when ((r_stconv = '1' or o_pin_stconv = '1')
+                        and r_stconv_fall = '0') else '0';
 
-    -- Enable generator
-    u_enable: entity work.enable(rtl) generic map(
-        G_WIDTH => 8
-    ) port map(
-        i_clk => i_clk,
-        i_clk_div => std_logic_vector(to_unsigned(G_CLK_DIV, 8)),
-        i_rst_n => i_rst_n,
-        o_enable => r_enable
-    );
+    u_counter: entity work.counter(rtl)
+        generic map(
+            G_WIDTH => 8
+        )
+        port map(
+            i_clk => i_clk,
+            i_rst_n => i_rst_n,
+            i_cyc_cnt => std_logic_vector(to_unsigned(G_STCONV_HOLD_CYC, 8)),
+            i_start => r_stconv,
+            o_int => r_stconv_fall
+        );
+
+    p_eoc: process(i_clk)
+        variable v_last: std_logic;
+    begin
+        if rising_edge(i_clk) then
+            if i_rst_n = '0' then
+                r_eoc <= '0';
+                r_cdc_eoc <= '0';
+                v_last := '0';
+            else
+                if r_eoc = '0' and v_last = '0' then
+                    r_eoc <= r_cdc_eoc;
+                else
+                    r_eoc <= '0';
+                end if;
+
+                v_last := r_cdc_eoc;
+                r_cdc_eoc <= i_pin_eoc;
+            end if;
+        end if;
+
+    end process p_eoc;
 
     p_conv: process(i_clk)
     begin
@@ -51,31 +73,28 @@ begin
             if i_rst_n = '0' then
                 r_state <= S_IDLE;
                 
-                o_pin_stconv <= '0';
+                r_stconv <= '0';
                 o_rd_en <= '0';
             else 
                 o_rd_en <= '0';
+                r_stconv <= '0';
 
-                if r_enable = '1' then
-                    o_pin_stconv <= '0';
+                case r_state is
+                    when S_IDLE =>
+                        -- Wait for start signal
+                        if i_start = '1' then
+                            r_stconv <= '1';
 
-                    case r_state is
-                        when S_IDLE =>
-                            -- Wait for start signal
-                            if i_start = '1' then
-                                o_pin_stconv <= '1';
+                            r_state <= S_CONVERTING;
+                        end if;
+                    when S_CONVERTING =>
+                        -- Started, wait for conversion to complete
+                        if r_eoc = '1' then
+                            o_rd_en <= '1';
 
-                                r_state <= S_CONVERTING;
-                            end if;
-                        when S_CONVERTING =>
-                            -- Started, wait for conversion to complete
-                            if r_eoc = '1' then
-                                o_rd_en <= '1';
-
-                                r_state <= S_IDLE;
-                            end if;
-                    end case;
-                end if;
+                            r_state <= S_IDLE;
+                        end if;
+                end case;
             end if;
         end if;
     end process p_conv;

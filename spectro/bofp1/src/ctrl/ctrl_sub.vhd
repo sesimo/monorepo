@@ -133,27 +133,29 @@ begin
         if i_cs_n /= '0' then
             v_dropped := true;
             o_fifo_rd <= '0';
-        elsif rising_edge(i_sclk) and r_streaming and r_sample_done = '1' then
+        elsif rising_edge(i_sclk) then
             o_fifo_rd <= '0';
 
-            -- When starting the last 4 bits, pop from fifo
-            if r_shf_count = 3 then
-                -- If the CS line has been dropped and picked up again,
-                -- and the last stream popped data from FIFO into the register
-                -- then the previously popped data can be re-used. This will
-                -- not have been previously shifted out onto the SPI bus
-                -- since the CS line was dropped.
-                if not (v_dropped and not v_outdated) then
-                    if i_fifo_empty = '1' then
-                        v_outdated := true;
-                    else
-                        o_fifo_rd <= '0';
+            if r_streaming and r_sample_done = '1' then
+                -- When starting the last 4 bits, pop from fifo
+                if r_shf_count = 3 then
+                    -- If the CS line has been dropped and picked up again,
+                    -- and the last stream popped data from FIFO into the register
+                    -- then the previously popped data can be re-used. This will
+                    -- not have been previously shifted out onto the SPI bus
+                    -- since the CS line was dropped.
+                    if not (v_dropped and not v_outdated) then
+                        if i_fifo_empty = '1' then
+                            v_outdated := true;
+                        else
+                            o_fifo_rd <= '1';
+                        end if;
                     end if;
                 end if;
-            end if;
 
-            v_dropped := false;
-            v_outdated := false;
+                v_dropped := false;
+                v_outdated := false;
+            end if;
         end if;
     end process p_stream;
 

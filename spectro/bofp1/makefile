@@ -3,18 +3,26 @@ TARGET?=
 OPTS?="--wave=wave.ghw"
 GHDL?=ghdl-mcode
 
-SOURCES=src/util/dff.vhd      \
-		src/util/cdc_vector.vhd \
-		src/util/counter.vhd  \
-		src/util/enable.vhd   \
-		src/afifo.vhd \
-		src/adc.vhd  \
-		src/pwm.vhd  \
-		src/ccd.vhd  \
-		src/spi/spi_common.vhd \
-		src/spi/spi_main.vhd \
-		src/spi/spi_sub.vhd  \
-		src/ctrl.vhd
+SOURCES=\
+	platform/uvvm/fifo_common.vhd \
+	platform/uvvm/fifo_data.vhd \
+	platform/uvvm/fifo_ctrl.vhd \
+	src/util/dff.vhd      \
+	src/util/cdc_vector.vhd \
+	src/util/counter.vhd  \
+	src/util/enable.vhd   \
+	src/afifo.vhd \
+	src/adc.vhd  \
+	src/pwm.vhd  \
+	src/ccd.vhd  \
+	src/spi/spi_common.vhd \
+	src/spi/spi_main.vhd \
+	src/spi/spi_sub.vhd  \
+	src/ctrl/ctrl_common_pkg.vhd \
+	src/ctrl/ctrl_main.vhd \
+	src/ctrl/ctrl_sub.vhd \
+	src/ctrl/ctrl.vhd \
+	src/bofp1.vhd
 
 GHDL_ARGS=--workdir=$(realpath build) --std=08 -frelaxed-rules \
 		  -P$(shell pwd)/build/ghdl

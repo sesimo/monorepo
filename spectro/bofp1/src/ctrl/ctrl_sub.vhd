@@ -151,10 +151,10 @@ begin
                             o_fifo_rd <= '1';
                         end if;
                     end if;
-                end if;
 
-                v_dropped := false;
-                v_outdated := false;
+                    v_dropped := false;
+                    v_outdated := false;
+                end if;
             end if;
         end if;
     end process p_stream;

@@ -49,6 +49,8 @@ architecture bhv of tb_bofp1 is
 
     constant c_clk_period: time := (1.0 / real(G_CLK_FREQ)) * (1 sec);
     constant c_sclk_period: time := c_clk_period * G_SCLK_DIV;
+
+    constant c_ccd_pix_count: integer := 3694;
 begin
     clock_generator(r_clk, r_clkena, c_clk_period, "OSC Main");
 
@@ -113,7 +115,7 @@ begin
             config=>r_spi_conf
         );
 
-        v_value := v_value + 1;
+        v_value := (v_value + 1) mod c_ccd_pix_count;
     end process p_adc_spi;
 
     p_main: process
@@ -122,6 +124,7 @@ begin
             r_rst <= '0';
         end procedure release_reset;
 
+        -- Check the readings from one stream (16 values)
         procedure check_adc_readings(
             count: integer;
             offset: integer;
@@ -170,37 +173,38 @@ begin
         release_reset;
         wait for 1 ps;
 
-        spi_master_transmit(
-            c_reg_sample,
-            "TX sample cmd",
-            r_spi_sub_if,
-            config => r_spi_conf
-        );
-
-        v_count_remain := 3694;
-
-        for i in 0 to 230 loop
-            if i /= 230 then
-                wait until r_fifo_wmark = '1';
-            else
-                wait until r_ccd_icg = '0';
-            end if;
-            v_data_tx(v_data_tx'high downto v_data_tx'high-15) := c_reg_stream;
-
-            spi_master_transmit_and_receive(
-                v_data_tx,
-                v_data,
-                "TX stream cmd",
+        for j in 0 to 1 loop
+            spi_master_transmit(
+                c_reg_sample,
+                "TX sample cmd",
                 r_spi_sub_if,
                 config => r_spi_conf
             );
 
-            if v_count_remain >= 16 then
-                v_count_remain := v_count_remain - 16;
-                check_adc_readings(16, i, v_data(v_data'high - 16 downto 0));
-            else
-                check_adc_readings(v_count_remain, i, v_data(v_data'high - 16 downto 0));
-            end if;
+            v_count_remain := c_ccd_pix_count;
+            for i in 0 to 230 loop
+                if i /= 230 then
+                    wait until r_fifo_wmark = '1';
+                else
+                    wait until r_ccd_icg = '0';
+                end if;
+                v_data_tx(v_data_tx'high downto v_data_tx'high-15) := c_reg_stream;
+
+                spi_master_transmit_and_receive(
+                    v_data_tx,
+                    v_data,
+                    "TX stream cmd",
+                    r_spi_sub_if,
+                    config => r_spi_conf
+                );
+
+                if v_count_remain >= 16 then
+                    v_count_remain := v_count_remain - 16;
+                    check_adc_readings(16, i, v_data(v_data'high - 16 downto 0));
+                else
+                    check_adc_readings(v_count_remain, i, v_data(v_data'high - 16 downto 0));
+                end if;
+            end loop;
         end loop;
 
         -- End simulation

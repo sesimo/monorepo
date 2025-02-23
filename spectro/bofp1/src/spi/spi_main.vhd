@@ -26,7 +26,6 @@ end entity spi_main;
 architecture rtl of spi_main is
     signal r_cs_n_buf: std_logic;
 
-    signal r_start_ext: std_logic;
     signal r_sample_done: std_logic;
     signal r_shift_done: std_logic;
 
@@ -53,27 +52,6 @@ begin
             o_shift_done => r_shift_done
         );
 
-    -- Detect the start condition and prolong it for one SCLK cycle
-    p_detect_start: process(i_clk)
-        variable v_sclk_last: std_logic;
-    begin
-        if rising_edge(i_clk) then
-            if i_rst_n = '0' then
-                r_start_ext <= '0';
-            else
-                if i_start = '1' then
-                    r_start_ext <= '1';
-                    v_sclk_last := '1';
-                elsif i_sclk /= v_sclk_last and i_sclk = '1' then
-                    -- Clear at next high edge of SCLK
-                    r_start_ext <= '0';
-                end if;
-
-                v_sclk_last := i_sclk;
-            end if;
-        end if;
-    end process p_detect_start;
-
     p_handle_state: process(i_clk)
     begin
         if rising_edge(i_clk) then
@@ -86,7 +64,7 @@ begin
 
                 case r_state is
                     when S_IDLE =>
-                        if r_start_ext = '1' then
+                        if i_start = '1' then
                             r_state <= S_STARTING;
                             r_cs_n_buf <= '0';
                         end if;

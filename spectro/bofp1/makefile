@@ -8,11 +8,8 @@ SOURCES=\
 	platform/uvvm/fifo_common.vhd \
 	platform/uvvm/fifo_data.vhd \
 	platform/uvvm/fifo_ctrl.vhd \
-	src/util/dff.vhd      \
-	src/util/cdc_vector.vhd \
 	src/util/counter.vhd  \
 	src/util/enable.vhd   \
-	src/afifo.vhd \
 	src/adc.vhd  \
 	src/pwm.vhd  \
 	src/ccd.vhd  \

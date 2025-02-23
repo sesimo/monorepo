@@ -26,10 +26,12 @@ architecture behaviour of ctrl_main is
 
     signal r_sub_count: integer range 0 to 3;
 
-    signal o_test: std_logic;
+    attribute dont_touch: string;
+    attribute dont_touch of r_sub_data: signal is "true";
+    attribute dont_touch of r_cdc_data: signal is "true";
 begin
 
-    p_count: process(i_clk, i_rst_n) is
+    p_count: process(i_clk) is
     begin
         if rising_edge(i_clk) then
             if i_rst_n = '0' then
@@ -43,7 +45,7 @@ begin
     end process p_count;
 
     -- Cross clock domain with the sub data and the sub ready signal
-    p_cdc: process(i_clk, i_rst_n) is
+    p_cdc: process(i_clk) is
     begin
         if rising_edge(i_clk) then
             if i_rst_n = '0' then
@@ -59,7 +61,7 @@ begin
         end if;
     end process p_cdc;
 
-    p_handle: process(i_clk, i_rst_n) is
+    p_handle: process(i_clk) is
         variable v_count_last: integer range 0 to 3;
     begin
         if rising_edge(i_clk) then
@@ -76,7 +78,7 @@ begin
                         when REG_SAMPLE =>
                             o_ccd_sample <= '1';
 
-                        when others => o_test <= 'Z';
+                        when others => null;
 
                     end case;
                 end if;

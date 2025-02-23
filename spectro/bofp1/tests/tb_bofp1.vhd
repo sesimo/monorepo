@@ -55,8 +55,7 @@ begin
     u_dut: entity work.bofp1(structural)
         generic map(
             G_CFG_WIDTH => G_CFG_WIDTH,
-            G_ADC_WIDTH => G_ADC_WIDTH,
-            G_CTRL_WIDTH => G_CTRL_WIDTH
+            G_ADC_WIDTH => G_ADC_WIDTH
         )
         port map(
             i_clk => r_clk,

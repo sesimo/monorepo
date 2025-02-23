@@ -48,7 +48,7 @@ architecture bhv of tb_bofp1 is
     constant c_clk_period: time := (1.0 / real(G_CLK_FREQ)) * (1 sec);
     constant c_sclk_period: time := c_clk_period * G_SCLK_DIV;
 begin
-    clock_generator(r_clk, r_clkena, c_clk_period, "Main");
+    clock_generator(r_clk, r_clkena, c_clk_period, "OSC Main");
 
     u_dut: entity work.bofp1(structural)
         generic map(

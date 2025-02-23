@@ -4,6 +4,7 @@ OPTS?="--wave=wave.ghw"
 GHDL?=ghdl-mcode
 
 SOURCES=\
+	platform/uvvm/clk_wizard.vhd \
 	platform/uvvm/fifo_common.vhd \
 	platform/uvvm/fifo_data.vhd \
 	platform/uvvm/fifo_ctrl.vhd \
@@ -33,6 +34,7 @@ target_name=$(shell basename $(1) | cut -d"." -f1)
 all: build/tb_adc.o
 
 build/%.o: $(SOURCES) tests/%.vhd
+	echo $(SOURCES)
 	$(GHDL) -a $(GHDL_ARGS) $^
 	@cd build && $(GHDL) -e $(GHDL_ARGS) $(call target_name, $@)
 

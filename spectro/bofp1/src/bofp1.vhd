@@ -20,6 +20,8 @@ entity bofp1 is
         i_adc_eoc: in std_logic;
         o_adc_stconv: out std_logic;
 
+        o_fifo_wmark: out std_logic;
+
         i_spi_main_miso: in std_logic;
         o_spi_main_mosi: out std_logic;
         o_spi_main_sclk: out std_logic;
@@ -66,7 +68,8 @@ architecture structural of bofp1 is
             rd_en: in std_logic;
             dout: out std_logic_vector(G_ADC_WIDTH-1 downto 0);
             full: out std_logic;
-            empty: out std_logic
+            empty: out std_logic;
+            prog_full: out std_logic
         );
     end component fifo_data;
 
@@ -163,7 +166,8 @@ begin
         din => r_adc_spi_data,
         rd_en => r_ctrl_fifo_rd_en,
         dout => r_ctrl_fifo_val,
-        empty => r_fifo_empty
+        empty => r_fifo_empty,
+        prog_full => o_fifo_wmark
     );
 
     u_ctrl: entity work.ctrl(behaviour) port map(

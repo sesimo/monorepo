@@ -59,8 +59,7 @@ begin
     r_out <= i_fifo_data when r_streaming else (others => '0');
 
     -- Count the number of shifts done
-    --r_shf_count <= ((r_shf_count + 1) mod 4) when r_shift_done = '1';
-    r_out_shf <= cur_shf_range(r_out, r_shf_count) when i_cs_n = '0';
+    r_out_shf <= cur_shf_range(r_out, r_shf_count);
 
     u_spi: entity work.spi_sub(rtl)
         generic map(

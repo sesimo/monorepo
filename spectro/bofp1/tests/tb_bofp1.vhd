@@ -131,7 +131,7 @@ begin
         begin
             for i in 0 to count-1 loop
                 v_head := data'high - i*16;
-                v_value := offset * count + i;
+                v_value := offset * 16 + i;
 
                 check_value(
                     data(v_head downto v_head-15),
@@ -143,6 +143,8 @@ begin
 
         variable v_data: std_logic_vector(271 downto 0) := (others => '0');
         variable v_data_tx: std_logic_vector(v_data'range) := (others => '0');
+
+        variable v_count_remain: integer;
     begin
         report_global_ctrl(VOID);
         report_msg_id_panel(VOID);
@@ -175,8 +177,10 @@ begin
             config => r_spi_conf
         );
 
-        for i in 0 to 254 loop
-            if i /= 254 then
+        v_count_remain := 3694;
+
+        for i in 0 to 230 loop
+            if i /= 230 then
                 wait until r_fifo_wmark = '1';
             else
                 wait until r_ccd_icg = '0';
@@ -191,7 +195,12 @@ begin
                 config => r_spi_conf
             );
 
-            check_adc_readings(16, i, v_data(v_data'high - 16 downto 0));
+            if v_count_remain >= 16 then
+                v_count_remain := v_count_remain - 16;
+                check_adc_readings(16, i, v_data(v_data'high - 16 downto 0));
+            else
+                check_adc_readings(v_count_remain, i, v_data(v_data'high - 16 downto 0));
+            end if;
         end loop;
 
         -- End simulation

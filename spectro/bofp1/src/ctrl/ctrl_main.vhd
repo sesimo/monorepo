@@ -24,7 +24,7 @@ architecture behaviour of ctrl_main is
     signal r_sub_data: std_logic_vector(i_sub_data'range);
     signal r_sub_rdy: std_logic;
 
-    signal r_sub_count: integer;
+    signal r_sub_count: integer range 0 to 3;
 
     signal o_test: std_logic;
 begin
@@ -58,7 +58,7 @@ begin
     end process p_cdc;
 
     p_handle: process(i_clk, i_rst_n) is
-        variable v_count_last: integer;
+        variable v_count_last: integer range 0 to 3;
     begin
         if rising_edge(i_clk) then
             if i_rst_n = '0' then

@@ -38,7 +38,7 @@ architecture rtl of tcd1304 is
     signal r_data_enable: std_logic;
     signal r_data_rst_n: std_logic;
 
-    signal r_rd_count: integer;
+    signal r_rd_count: integer range 0 to G_NUM_ELEMENTS;
 begin
     o_pin_icg <= r_icg_buf;
     o_pin_mclk <= r_mclk_buf;

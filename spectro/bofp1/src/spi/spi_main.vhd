@@ -74,9 +74,9 @@ begin
                         if r_sample_done = '1' and r_shift_done = '1' then
                             r_state <= S_STOPPING;
                             r_cs_n_buf <= '1';
-                            o_rdy <= '1';
                         end if;
                     when S_STOPPING =>
+                        o_rdy <= '1';
                         r_state <= S_IDLE;
                 end case;
             end if;

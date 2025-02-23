@@ -64,7 +64,6 @@ begin
 
     u_spi: entity work.spi_sub(rtl)
         generic map(
-            G_MODE => 1,
             G_DATA_WIDTH => G_DATA_WIDTH
         )
         port map(

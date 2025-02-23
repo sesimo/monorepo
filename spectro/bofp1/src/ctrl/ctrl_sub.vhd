@@ -39,7 +39,7 @@ architecture behaviour of ctrl_sub is
     -- continuing to hold CS after reading from REG_STREAM
     signal r_streaming: boolean;
 
-    signal r_shf_count: integer;
+    signal r_shf_count: integer range 0 to 3;
 
     -- Current range of the SPI output shift register
     function cur_shf_range(

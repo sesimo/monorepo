@@ -3,6 +3,8 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
+use work.utils.all;
+
 entity spi_common is
     generic (
         G_MODE: integer range 0 to 3;
@@ -34,7 +36,7 @@ begin
     -- Shift data out on `o_out`
     p_shift: process(i_sclk, i_cs_n)
         variable v_buf: std_logic_vector(G_DATA_WIDTH-1 downto 0);
-        variable v_count: integer;
+        variable v_count: integer range 0 to int_max(G_DATA_WIDTH);
 
         impure function should_shift(signal clk: std_logic) return boolean is
         begin
@@ -68,7 +70,7 @@ begin
 
     -- Sample data and place it in the buffer. This notifies in `o_rdy`
     p_sample: process(i_sclk, i_cs_n)
-        variable v_count: integer;
+        variable v_count: integer range 0 to int_max(G_DATA_WIDTH);
 
         impure function should_sample(signal clk: std_logic) return boolean is
         begin

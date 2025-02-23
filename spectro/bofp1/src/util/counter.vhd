@@ -3,6 +3,8 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
+use work.utils.all;
+
 entity counter is
     generic (
         G_WIDTH: integer
@@ -18,7 +20,7 @@ entity counter is
 end entity counter;
 
 architecture rtl of counter is
-    signal r_count: integer;
+    signal r_count: integer range 0 to int_max(G_WIDTH);
 begin
 
     p_count: process(i_clk)

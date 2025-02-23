@@ -3,6 +3,8 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
+use work.utils.all;
+
 entity pwm is
     generic (
         G_WIDTH: integer
@@ -23,8 +25,8 @@ architecture rtl of pwm is
 begin
 
     p_pwm: process(i_clk)
-        variable v_count_per: integer := 0;
-        variable v_count_dc: integer := 0;
+        variable v_count_per: integer range 0 to int_max(G_WIDTH) := 0;
+        variable v_count_dc: integer range 0 to int_max(G_WIDTH) := 0;
     begin
         if rising_edge(i_clk) then
             if i_rst_n = '0' then

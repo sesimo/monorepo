@@ -3,6 +3,8 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
+use work.utils.all;
+
 -- brief Enable generator
 entity enable is
     generic (
@@ -17,7 +19,7 @@ entity enable is
 end entity enable;
 
 architecture rtl of enable is
-    signal r_count: integer;
+    signal r_count: integer range 0 to int_max(G_WIDTH);
 begin
 
     -- Generate enable signal

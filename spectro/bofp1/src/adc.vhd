@@ -30,9 +30,6 @@ architecture rtl of ads8329 is
     signal r_eoc: std_logic;
     signal r_cdc_eoc: std_logic;
 begin
-    o_pin_stconv <= '1' when ((r_stconv = '1' or o_pin_stconv = '1')
-                        and r_stconv_fall = '0') else '0';
-
     u_counter: entity work.counter(rtl)
         generic map(
             G_WIDTH => 8
@@ -64,8 +61,19 @@ begin
                 r_cdc_eoc <= i_pin_eoc;
             end if;
         end if;
-
     end process p_eoc;
+
+    p_stconv: process(i_clk)
+    begin
+        if rising_edge(i_clk) then
+            if i_rst_n = '0' then
+                o_pin_stconv <= '0';
+            else
+                o_pin_stconv <= '1' when ((r_stconv = '1' or o_pin_stconv = '1') 
+                                and r_stconv_fall = '0') else '0';
+            end if;
+        end if;
+    end process p_stconv;
 
     p_conv: process(i_clk)
     begin

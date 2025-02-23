@@ -34,8 +34,10 @@ begin
         if rising_edge(i_clk) then
             if i_rst_n = '0' then
                 r_sub_count <= 0;
+            elsif r_sub_count = 3 then
+                r_sub_count <= 0;
             elsif r_sub_rdy = '1' then
-                r_sub_count <= (r_sub_count + 1 ) mod 4;
+                r_sub_count <= r_sub_count + 1;
             end if;
         end if;
     end process p_count;

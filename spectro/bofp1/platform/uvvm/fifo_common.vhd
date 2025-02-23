@@ -13,6 +13,7 @@ use uvvm_util.data_fifo_pkg.all;
 entity fifo_common is
     generic (
         G_DATA_WIDTH: integer := 16;
+        G_PROG_FULL: integer := 1;
         G_SIZE: integer
     );
     port (
@@ -24,7 +25,8 @@ entity fifo_common is
         rd_en: in std_logic;
         dout: out std_logic_vector(G_DATA_WIDTH-1 downto 0);
         full: out std_logic;
-        empty: out std_logic
+        empty: out std_logic;
+        prog_full: out std_logic
     );
 end entity fifo_common;
 
@@ -37,8 +39,11 @@ begin
     begin
         if rst = '1' then
             full <= '0';
+            prog_full <= '0';
         elsif rising_edge(wr_clk) then
             full <= '1' when uvvm_fifo_is_full(r_fifo) else '0';
+            prog_full <= '1' when uvvm_fifo_get_count(r_fifo) >= G_PROG_FULL
+                         else '0';
         end if;
     end process;
 

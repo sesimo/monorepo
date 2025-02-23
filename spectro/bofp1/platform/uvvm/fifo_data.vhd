@@ -15,7 +15,8 @@ entity fifo_data is
         rd_en: in std_logic;
         dout: out std_logic_vector(15 downto 0);
         full: out std_logic;
-        empty: out std_logic
+        empty: out std_logic;
+        prog_full: out std_logic
     );
 end entity fifo_data;
 
@@ -24,7 +25,8 @@ begin
     u_fifo: entity work.fifo_common(bhv)
         generic map(
             G_DATA_WIDTH => 16,
-            G_SIZE => 1024
+            G_SIZE => 1024,
+            G_PROG_FULL => 256
         )
         port map(
             rst => rst,
@@ -35,6 +37,7 @@ begin
             rd_en => rd_en,
             dout => dout,
             full => full,
-            empty => empty
+            empty => empty,
+            prog_full => prog_full
         );
 end architecture bhv;

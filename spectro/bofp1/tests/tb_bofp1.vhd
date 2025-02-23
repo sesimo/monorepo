@@ -36,6 +36,8 @@ architecture bhv of tb_bofp1 is
 
     signal r_clkena: boolean;
 
+    signal r_fifo_wmark: std_logic;
+
     signal r_spi_main_if: t_spi_if;
     signal r_spi_sub_if: t_spi_if;
     signal r_spi_conf: t_spi_bfm_config := C_SPI_BFM_CONFIG_DEFAULT;
@@ -66,6 +68,8 @@ begin
 
             i_adc_eoc => r_adc_eoc,
             o_adc_stconv => r_adc_stconv,
+
+            o_fifo_wmark => r_fifo_wmark,
 
             i_spi_main_miso => r_spi_main_if.miso,
             o_spi_main_mosi => r_spi_main_if.mosi,
@@ -138,7 +142,7 @@ begin
             end loop;
         end procedure check_adc_readings;
 
-        variable v_data: std_logic_vector(255 downto 0) := (others => '0');
+        variable v_data: std_logic_vector(271 downto 0) := (others => '0');
         variable v_data_tx: std_logic_vector(v_data'range) := (others => '0');
     begin
         report_global_ctrl(VOID);
@@ -172,8 +176,12 @@ begin
             config => r_spi_conf
         );
 
-        for i in 0 to 271 loop
-            wait for 26.7 us;
+        for i in 0 to 254 loop
+            if i /= 254 then
+                wait until r_fifo_wmark = '1';
+            else
+                wait until r_ccd_icg = '0';
+            end if;
             v_data_tx(v_data_tx'high downto v_data_tx'high-15) := c_reg_stream;
 
             spi_master_transmit_and_receive(
@@ -184,7 +192,7 @@ begin
                 config => r_spi_conf
             );
 
-            check_adc_readings(15, i, v_data(v_data'high - 16 downto 0));
+            check_adc_readings(16, i, v_data(v_data'high - 16 downto 0));
         end loop;
 
         -- End simulation

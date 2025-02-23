@@ -82,8 +82,10 @@ begin
     begin
         if i_cs_n /= '0' then
             r_shf_count <= 0;
-        elsif falling_edge(i_sclk) and r_shift_done = '1' then
-            r_shf_count <= (r_shf_count + 1) mod 4;
+        elsif falling_edge(i_sclk) then
+            if r_shift_done = '1' then
+                r_shf_count <= (r_shf_count + 1) mod 4;
+            end if;
         end if;
     end process p_count;
 

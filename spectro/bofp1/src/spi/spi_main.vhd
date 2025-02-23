@@ -5,7 +5,6 @@ use ieee.numeric_std.all;
 
 entity spi_main is
     generic (
-        G_MODE: integer range 0 to 3 := 1;
         G_DATA_WIDTH: integer := 8
     );
     port (
@@ -39,7 +38,6 @@ begin
     -- Common SPI entity, sampling in and shifting out
     u_spi_common: entity work.spi_common
         generic map(
-            G_MODE => G_MODE,
             G_DATA_WIDTH => G_DATA_WIDTH
         )
         port map(

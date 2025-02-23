@@ -8,7 +8,6 @@ use ieee.numeric_std.all;
 -- pay extra attention to ensure CCD happens safely.
 entity spi_sub is
     generic (
-        G_MODE: integer range 0 to 3 := 1;
         G_DATA_WIDTH: integer := 8
     );
     port (
@@ -32,7 +31,6 @@ begin
     -- Instantiate common enttiy
     u_spi_common: entity work.spi_common
         generic map(
-            G_MODE => G_MODE,
             G_DATA_WIDTH => G_DATA_WIDTH
         )
         port map(

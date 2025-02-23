@@ -149,11 +149,11 @@ begin
                             v_outdated := true;
                         else
                             o_fifo_rd <= '1';
+                            v_outdated := false;
                         end if;
                     end if;
 
                     v_dropped := false;
-                    v_outdated := false;
                 end if;
             end if;
         end if;

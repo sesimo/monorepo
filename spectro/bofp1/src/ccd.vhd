@@ -40,7 +40,7 @@ architecture rtl of tcd1304 is
 
     signal r_rd_count: integer range 0 to G_NUM_ELEMENTS;
 begin
-    o_pin_icg <= r_icg_buf;
+    o_pin_icg <= not r_icg_buf;
     o_pin_mclk <= r_mclk_buf;
 
     -- Generate shutter signal

@@ -21,7 +21,7 @@ entity ads8329 is
 end entity ads8329;
 
 architecture rtl of ads8329 is
-    type t_state is (S_IDLE, S_CONVERTING);
+    type t_state is (S_IDLE, S_START, S_CONVERTING);
     signal r_state: t_state;
 
     signal r_stconv: std_logic;
@@ -96,8 +96,15 @@ begin
                         if i_start = '1' then
                             r_stconv <= '1';
 
+                            r_state <= S_START;
+                        end if;
+                    when S_START =>
+                        -- Wait for EOC to go low, which indicates the ADC
+                        -- is converting.
+                        if r_eoc = '0' then
                             r_state <= S_CONVERTING;
                         end if;
+
                     when S_CONVERTING =>
                         -- Started, wait for conversion to complete
                         if r_eoc = '1' then

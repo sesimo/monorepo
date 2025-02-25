@@ -1,0 +1,8 @@
+
+config SENSOR_BOFP1
+    bool "Enable driver support for BOFP1 driver"
+    default y
+    depends on DT_HAS_SESIMO_BOFP1_ENABLED
+    imply SPI
+    imply RTIO
+    imply SENSOR_ASYNC_API

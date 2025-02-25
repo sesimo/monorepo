@@ -53,6 +53,7 @@ begin
         );
 
     p_handle_state: process(i_clk)
+        variable v_sclk_last: std_logic;
     begin
         if rising_edge(i_clk) then
             if i_rst_n = '0' then
@@ -66,12 +67,17 @@ begin
                     when S_IDLE =>
                         if i_start = '1' then
                             r_state <= S_STARTING;
-                            r_cs_n_buf <= '0';
                         end if;
                     when S_STARTING =>
-                        r_state <= S_RUNNING;
+                        -- Pull CS low on the first falling edge detected
+                        if i_sclk = '0' and i_sclk /= v_sclk_last then
+                            r_cs_n_buf <= '0';
+                            r_state <= S_RUNNING;
+                        end if;
                     when S_RUNNING =>
-                        if r_sample_done = '1' and r_shift_done = '1' then
+                        -- SPI is in mode 1, which means sampling on falling
+                        -- edge. CS can then be raised again after that.
+                        if r_sample_done = '1' then
                             r_state <= S_STOPPING;
                             r_cs_n_buf <= '1';
                         end if;
@@ -79,6 +85,8 @@ begin
                         o_rdy <= '1';
                         r_state <= S_IDLE;
                 end case;
+
+                v_sclk_last := i_sclk;
             end if;
         end if;
     end process p_handle_state;

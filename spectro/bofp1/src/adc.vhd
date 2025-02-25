@@ -69,8 +69,11 @@ begin
             if i_rst_n = '0' then
                 o_pin_stconv <= '0';
             else
-                o_pin_stconv <= '1' when ((r_stconv = '1' or o_pin_stconv = '1') 
-                                and r_stconv_fall = '0') else '0';
+                if r_stconv = '1' then
+                    o_pin_stconv <= '1';
+                elsif r_stconv_fall = '1' then
+                    o_pin_stconv <= '0';
+                end if;
             end if;
         end if;
     end process p_stconv;

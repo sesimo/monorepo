@@ -15,6 +15,7 @@ entity bofp1 is
         o_ccd_sh: out std_logic;
         o_ccd_mclk: out std_logic;
         o_ccd_icg: out std_logic;
+        o_ccd_busy: out std_logic;
 
         i_adc_eoc: in std_logic;
         o_adc_stconv: out std_logic;
@@ -109,7 +110,8 @@ begin
         o_pin_sh => o_ccd_sh,
         o_pin_mclk => o_ccd_mclk,
         o_pin_icg => o_ccd_icg,
-        o_data_rdy => r_ccd_data_rdy
+        o_data_rdy => r_ccd_data_rdy,
+        o_ccd_busy => o_ccd_busy
     );
 
     u_adc: entity work.ads8329(rtl) port map(

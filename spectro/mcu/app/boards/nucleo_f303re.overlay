@@ -1,0 +1,16 @@
+/ {
+    chosen {
+        sesimo,bofp1 = <&bofp1>;
+    };
+};
+
+&spi1 {
+    status = "okay";
+
+    bofp1: bofp1@0 {
+        status = "okay";
+        compatible = "sesimo,bofp1";
+        reg = <0>;
+        spi-max-frequency = <18000000>;
+    };
+};

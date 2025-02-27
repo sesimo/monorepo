@@ -134,8 +134,10 @@ static int bofp1_init(const struct device *dev)
 
 #define BOFP1_INIT(inst_)                                                      \
         static const struct bofp1_cfg bofp1_cfg_##inst_##__ = {                \
-                .bus = SPI_DT_SPEC_INST_GET(                                   \
-                        inst_, SPI_MODE_MASTER | SPI_MODE_CPOL, 0),            \
+                .bus = SPI_DT_SPEC_INST_GET(inst_,                             \
+                                            SPI_MODE_CPHA | SPI_WORD_SET(8) |  \
+                                                    SPI_TRANSFER_MSB,          \
+                                            0),                                \
                 .psc = DT_INST_PROP(inst_, prescaler),                         \
                 .clock_frequency = DT_INST_PROP(inst_, clock_frequency),       \
         };                                                                     \

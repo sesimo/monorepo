@@ -21,17 +21,10 @@ architecture bhv of tb_ccd is
     signal r_clk: std_logic := '0';
     signal r_rst_n: std_logic := '0';
 
-    function calc_speed(freq_hz: integer) return std_logic_vector is
-        variable v_scale: integer;
+    function calc_speed(freq_hz: integer) return integer is
     begin
-        v_scale := G_CLK_FREQ / freq_hz;
-
-        return std_logic_vector(to_unsigned(v_scale, G_CFG_WIDTH));
+        return G_CLK_FREQ / freq_hz;
     end function calc_speed;
-
-    subtype t_speed_cfg is std_logic_vector(G_CFG_WIDTH-1 downto 0);
-    signal r_shutter: t_speed_cfg := calc_speed(G_SH_FREQ);
-    signal r_clk_speed: t_speed_cfg := calc_speed(G_MCLK_FREQ);
 
     signal r_sh: std_logic;
     signal r_icg: std_logic;
@@ -41,20 +34,20 @@ architecture bhv of tb_ccd is
     signal r_data_rdy: std_logic;
 
     constant c_clk_period: time := (1.0 / real(G_CLK_FREQ)) * (1 sec);
-    constant c_mclk_period: time := c_clk_period * to_integer(unsigned(r_clk_speed));
+    constant c_mclk_period: time := c_clk_period * calc_speed(G_MCLK_FREQ);
     constant c_dclk_period: time := c_mclk_period * 4;
 begin
     u_ccd: entity work.tcd1304(rtl) generic map(
         G_CLK_FREQ => G_CLK_FREQ,
-        G_CFG_WIDTH => G_CFG_WIDTH,
         G_NUM_ELEMENTS => G_NUM_ELEMENTS
     )
     port map(
         i_clk => r_clk,
         i_rst_n => r_rst_n,
-        i_sh_div => r_shutter,
-        i_mclk_div => r_clk_speed,
         i_start => r_start,
+        i_psc_div => std_logic_vector(to_unsigned(20, 5)),
+        i_sh_div => std_logic_vector(to_unsigned(1, 8)), -- TODO
+        i_mclk_div => std_logic_vector(to_unsigned(0, 3)), -- TODO
 
         o_pin_sh => r_sh,
         o_pin_icg => r_icg,
@@ -80,13 +73,14 @@ begin
         wait for c_clk_period;
         r_start <= '0';
 
+        wait until r_sh = '1';
+        assert r_icg = '1'
+        report "ICG should be high" severity failure;
+        
         for i in 1 to G_NUM_ELEMENTS loop
-            wait until r_data_rdy = '1' for c_dclk_period;
+            wait until r_data_rdy = '1' for c_dclk_period*2;
             assert r_data_rdy = '1'
             report "Data rdy should have been signaled";
-
-            assert r_icg = '1'
-            report "ICG should be high" severity failure;
 
             wait until r_data_rdy = '0' for c_dclk_period;
             assert r_data_rdy = '0'

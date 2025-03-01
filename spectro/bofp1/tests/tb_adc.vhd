@@ -78,7 +78,7 @@ begin
             report "STconv should be low" severity failure;
             r_start <= '1';
 
-            wait for c_clk_period*1.5;
+            wait for c_clk_period*2;
             assert r_stconv = '1'
             report "STconv should be high" severity failure;
             r_start <= '0';

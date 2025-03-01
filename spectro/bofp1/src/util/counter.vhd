@@ -12,7 +12,7 @@ entity counter is
 
     port (
         i_clk: in std_logic;
-        i_start: in std_logic;
+        i_en: in std_logic;
         i_cyc_cnt: in std_logic_vector(G_WIDTH-1 downto 0);
         i_rst_n: in std_logic;
         o_int: out std_logic
@@ -26,19 +26,14 @@ begin
     p_count: process(i_clk)
     begin
         if rising_edge(i_clk) then
+            o_int <= '0';
+
             if i_rst_n = '0' then
                 r_count <= 0;
-                o_int <= '0';
-            else
+            elsif i_en = '1' then
                 r_count <= r_count + 1;
-                o_int <= '0';
 
-                if r_count = 0 then
-                    -- Only restart when i_start is high
-                    if i_start = '0' then
-                        r_count <= 0;
-                    end if;
-                elsif r_count >= unsigned(i_cyc_cnt) - 1 then
+                if r_count >= unsigned(i_cyc_cnt) - 1 then
                     o_int <= '1';
                     r_count <= 0;
                 end if;

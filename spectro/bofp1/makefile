@@ -11,6 +11,7 @@ SOURCES=\
 	src/util/utils_pkg.vhd  \
 	src/util/counter.vhd  \
 	src/util/enable.vhd   \
+	src/util/pulse.vhd   \
 	src/adc.vhd  \
 	src/pwm.vhd  \
 	src/ccd.vhd  \

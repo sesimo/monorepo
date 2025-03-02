@@ -13,7 +13,8 @@ entity ctrl_main is
         i_sub_data: in std_logic_vector(3 downto 0);
         i_sub_rdy: in std_logic;
 
-        o_ccd_sample: out std_logic
+        o_ccd_sample: out std_logic;
+        o_regmap: out t_regmap
     );
 end entity ctrl_main;
 
@@ -30,20 +31,6 @@ architecture behaviour of ctrl_main is
     attribute dont_touch of r_sub_data: signal is "true";
     attribute dont_touch of r_cdc_data: signal is "true";
 begin
-
-    p_count: process(i_clk) is
-    begin
-        if rising_edge(i_clk) then
-            if i_rst_n = '0' then
-                r_sub_count <= 0;
-            elsif r_sub_count = 3 then
-                r_sub_count <= 0;
-            elsif r_sub_rdy = '1' then
-                r_sub_count <= r_sub_count + 1;
-            end if;
-        end if;
-    end process p_count;
-
     -- Cross clock domain with the sub data and the sub ready signal
     p_cdc: process(i_clk) is
     begin
@@ -62,28 +49,55 @@ begin
     end process p_cdc;
 
     p_handle: process(i_clk) is
-        variable v_count_last: integer range 0 to 3;
+        variable v_reg: t_reg;
+        variable v_octet: std_logic_vector(7 downto 0);
     begin
         if rising_edge(i_clk) then
             if i_rst_n = '0' then
-                v_count_last := 0;
+                r_sub_count <= 0;
                 o_ccd_sample <= '0';
+
+                o_regmap <= c_regmap_default;
             else
                 o_ccd_sample <= '0';
 
-                if r_sub_count =  1 and r_sub_count /= v_count_last then
-                    -- In the second 4-bit sequence. Register has been received
-                    -- and we can issue the correct command base on it.
-                    case parse_reg(r_sub_data) is
-                        when REG_SAMPLE =>
-                            o_ccd_sample <= '1';
+                if r_sub_rdy = '1' then
+                    if r_sub_count /= 3 then
+                        r_sub_count <= r_sub_count + 1;
+                    else
+                        r_sub_count <= 0;
+                    end if;
 
-                        when others => null;
+                    v_octet := v_octet(3 downto 0) & r_sub_data;
 
-                    end case;
+                    if r_sub_count = 0 then
+                        -- After the first 4-bit sequence. Register has been
+                        -- received and we can issue the correct
+                        -- command based on it.
+                        v_reg := parse_reg(r_sub_data);
+
+                        case v_reg is
+                            when REG_SAMPLE =>
+                                o_ccd_sample <= '1';
+
+                            when others => null;
+
+                        end case;
+                    elsif r_sub_count = 3 then
+                        -- After the last 4-bit sequence
+
+                        case v_reg is
+                            when REG_CLKDIV =>
+                                o_regmap.clkdiv <= v_octet;
+
+                            when REG_SHDIV =>
+                                o_regmap.shdiv <= v_octet;
+
+                            when others => null;
+
+                        end case;
+                    end if;
                 end if;
-
-                v_count_last := r_sub_count;
             end if;
         end if;
     end process p_handle;

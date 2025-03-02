@@ -54,6 +54,7 @@ architecture behaviour of ctrl_sub is
     end function cur_shf_range;
 begin
     o_data <= r_in_buf;
+    o_rdy <= r_sample_done when not r_streaming else '0';
 
     -- TODO: ctrl data
     r_out <= i_fifo_data when r_streaming else (others => '0');
@@ -90,11 +91,8 @@ begin
     p_handle: process(i_sclk, i_cs_n)
     begin
         if i_cs_n /= '0' then
-            o_rdy <= '0';
             r_streaming <= false;
         elsif rising_edge(i_sclk) then
-            o_rdy <= '0';
-
             -- When r_sample_one=1, 4 bits have been received from the SPI
             -- main. This process should determine whether or not to
             -- forward the data to the main clock domain. If streaming mode
@@ -105,18 +103,13 @@ begin
                 -- they should by default be forwarded to the main clock
                 -- domain. Exceptions to this case will clear o_rdy later
                 -- in this process.
-                o_rdy <= '1';
 
                 -- Sample_done=1 and shift count=1, means that the first 4
                 -- bits have been received
                 if r_shf_count = 1 then
                     case parse_reg(r_in_buf) is
-                        -- Enter streaming mode, and explicitly
-                        -- clear o_rdy. This prevents
-                        -- forwarding to the main clock domain
                         when REG_STREAM =>
                             r_streaming <= true;
-                            o_rdy <= '0';
 
                         -- Everything else is forwarded
                         when others => null;

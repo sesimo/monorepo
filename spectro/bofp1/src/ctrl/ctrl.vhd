@@ -3,6 +3,8 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
+use work.ctrl_common.all;
+
 entity ctrl is
     port (
         i_clk: in std_logic;
@@ -17,7 +19,8 @@ entity ctrl is
 
         i_fifo_empty: in std_logic;
         i_fifo_data: in std_logic_vector(15 downto 0);
-        o_fifo_rd: out std_logic
+        o_fifo_rd: out std_logic;
+        o_regmap: out t_regmap
     );
 end entity ctrl;
 
@@ -33,7 +36,9 @@ begin
             o_ccd_sample => o_ccd_sample,
 
             i_sub_data => r_sub_data,
-            i_sub_rdy => r_sub_rdy
+            i_sub_rdy => r_sub_rdy,
+
+            o_regmap => o_regmap
         );
 
     u_ctrl_sub: entity work.ctrl_sub(behaviour)

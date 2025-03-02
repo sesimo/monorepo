@@ -54,7 +54,7 @@ architecture behaviour of ctrl_sub is
     end function cur_shf_range;
 begin
     o_data <= r_in_buf;
-    o_rdy <= r_sample_done when not r_streaming else '0';
+    o_rdy <= r_sample_done;
 
     -- TODO: ctrl data
     r_out <= i_fifo_data when r_streaming else (others => '0');

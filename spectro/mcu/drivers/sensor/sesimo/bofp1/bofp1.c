@@ -38,7 +38,7 @@ int bofp1_access(const struct device *dev, bool write, uint8_t addr, void *data,
 
         reg = addr << BOFP1_REG_OFFSET;
         if (write) {
-                // reg |= BOFP1_REG_BIT_WR;
+                reg |= BOFP1_REG_BIT_WR;
 
                 return spi_write_dt(&cfg->bus, &tx_set);
         }

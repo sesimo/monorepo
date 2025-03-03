@@ -18,6 +18,8 @@
         compatible = "sesimo,bofp1";
         reg = <0>;
         spi-max-frequency = <18000000>;
+        prescaler = <20>;
+        clkdiv = <7>;
     };
 };
 

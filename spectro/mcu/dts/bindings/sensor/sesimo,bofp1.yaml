@@ -17,3 +17,16 @@ properties:
     default: 100000000
     description: |
       Operating clock frequency (in Hz) for the FPGA. 
+
+  clkdiv:
+    type: int
+    default: 0
+    description: |
+      Clock divider value. The master clock frequency for the CCD is given
+      by `f = clock-frequency / (25 + 100/7 * clkdiv)`
+
+  integration-time:
+    type: int
+    default: 20000
+    description: |
+      Set integration time (in nanoseconds).

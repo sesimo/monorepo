@@ -51,11 +51,13 @@ architecture rtl of tcd1304 is
     signal r_mclk_en: std_logic;
 
     signal r_psc_en: std_logic;
+    signal r_psc_div: std_logic_vector(i_psc_div'high+1 downto 0);
 
     signal r_sh_en: std_logic;
     signal r_sh_delayed: std_logic;
     signal r_sh_shf: std_logic_vector(G_SH_DELAY_CYC-1 downto 0);
     signal r_sh_buf: std_logic;
+    signal r_sh_div: std_logic_vector(i_sh_div'high+1 downto 0);
 
     signal r_data_enable: std_logic;
     signal r_data_rst_n: std_logic;
@@ -66,6 +68,11 @@ begin
     o_pin_mclk <= r_mclk_buf;
     o_pin_sh <= r_sh_delayed;
     o_data_rdy <= r_data_enable;
+
+    r_psc_div <= std_logic_vector(resize(
+                 unsigned(i_psc_div) + 1, r_psc_div'length));
+    r_sh_div <= std_logic_vector(resize(
+                 unsigned(i_sh_div) + 1, r_sh_div'length));
 
     -- Adjust the MCLK count value and pulse width
     p_mclk_adjust: process(i_clk)
@@ -119,26 +126,26 @@ begin
     -- Counter for the prescaler
     u_counter_psc: entity work.counter(rtl)
         generic map(
-            G_WIDTH => 5
+            G_WIDTH => 6
         )
         port map(
             i_clk => i_clk,
             i_rst_n => i_rst_n,
             i_en => r_mclk_en,
-            i_cyc_cnt => i_psc_div,
+            i_cyc_cnt => r_psc_div,
             o_int => r_psc_en
         );
 
     -- Counter for SH signal
     u_counter_sh: entity work.counter(rtl)
         generic map(
-            G_WIDTH => 8
+            G_WIDTH => 9
         )
         port map(
             i_clk => i_clk,
             i_rst_n => i_rst_n,
             i_en => r_psc_en,
-            i_cyc_cnt => i_sh_div,
+            i_cyc_cnt => r_sh_div,
             o_int => r_sh_en
         );
 

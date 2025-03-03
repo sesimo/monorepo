@@ -26,17 +26,24 @@ package ctrl_common is
     subtype t_reg_vector is std_logic_vector(c_reg_width-1 downto 0);
     
     function parse_reg(code: t_reg_vector) return t_reg;
+
+    function is_write(code: t_reg_vector) return boolean;
 end package ctrl_common;
 
 package body ctrl_common is
 
     function parse_reg(code: t_reg_vector)
     return t_reg is
-        variable v_uval: unsigned(c_reg_width-1 downto 0);
+        variable v_uval: unsigned(code'high-1 downto 0);
     begin
-        v_uval := unsigned(code(code'high downto code'high-v_uval'high));
+        v_uval := unsigned(code(v_uval'high downto 0));
 
         return t_reg'val(to_integer(v_uval)); 
     end function parse_reg;
+
+    function is_write(code: t_reg_vector) return boolean is
+    begin
+        return code(code'high) = '1';
+    end function is_write;
 
 end package body ctrl_common;

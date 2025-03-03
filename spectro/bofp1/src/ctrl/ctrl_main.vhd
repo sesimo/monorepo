@@ -58,7 +58,7 @@ begin
     end process p_cdc;
 
     p_handle: process(i_clk) is
-        variable v_reg: t_reg;
+        variable v_reg: t_reg_vector;
         variable v_octet: std_logic_vector(7 downto 0);
     begin
         if rising_edge(i_clk) then
@@ -67,6 +67,7 @@ begin
                 o_ccd_sample <= '0';
 
                 o_regmap <= c_regmap_default;
+                v_octet := (others => 'Z');
             else
                 o_ccd_sample <= '0';
 
@@ -83,19 +84,20 @@ begin
                         -- After the first 4-bit sequence. Register has been
                         -- received and we can issue the correct
                         -- command based on it.
-                        v_reg := parse_reg(r_sub_data);
+                        v_reg := r_sub_data;
 
-                        case v_reg is
-                            when REG_SAMPLE =>
-                                o_ccd_sample <= '1';
+                        if is_write(v_reg) then
+                            case parse_reg(v_reg) is
+                                when REG_SAMPLE =>
+                                    o_ccd_sample <= '1';
 
-                            when others => null;
+                                when others => null;
 
-                        end case;
-                    elsif r_sub_count = 3 then
+                            end case;
+                        end if;
+                    elsif r_sub_count = 3 and is_write(v_reg) then
                         -- After the last 4-bit sequence
-
-                        case v_reg is
+                        case parse_reg(v_reg) is
                             when REG_CLKDIV =>
                                 o_regmap.clkdiv <= v_octet;
 

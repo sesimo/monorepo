@@ -14,7 +14,6 @@ SOURCES=\
 	src/util/pulse.vhd   \
 	src/reset.vhd  \
 	src/adc.vhd  \
-	src/pwm.vhd  \
 	src/ccd.vhd  \
 	src/spi/spi_common.vhd \
 	src/spi/spi_main.vhd \
@@ -26,8 +25,8 @@ SOURCES=\
 	src/bofp1.vhd
 
 GHDL_ARGS=--workdir=$(realpath build) --std=08 -frelaxed-rules \
-		  -P$(shell pwd)/build/ghdl
-GHDL_RUNARGS=--assert-level=failure
+		  -P$(shell pwd)/build/ghdl -g
+GHDL_RUNARGS=--assert-level=warning
 
 target_name=$(shell basename $(1) | cut -d"." -f1)
 

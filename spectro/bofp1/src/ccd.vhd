@@ -67,15 +67,27 @@ begin
     o_pin_sh <= r_sh_delayed;
     o_data_rdy <= r_data_enable;
 
-    -- Master clock frequency is determined by the configurable 3-bit value.
-    r_mclk_cnt <= std_logic_vector(to_unsigned(
-        c_mclk_div_lowest + c_mclk_div_diff * to_integer(unsigned(i_mclk_div)),
-        G_MCLK_DIV_WIDTH
-    ));
-    r_mclk_pulse <= std_logic_vector(resize(
-        unsigned(r_mclk_cnt) srl 1,
-        G_MCLK_DIV_WIDTH
-    ));
+    -- Adjust the MCLK count value and pulse width
+    p_mclk_adjust: process(i_clk)
+    begin
+        if rising_edge(i_clk) then
+            if i_rst_n = '0' then
+                r_mclk_cnt <= (others => '1');
+                r_mclk_pulse <= (others => '1');
+            else
+                r_mclk_cnt <= std_logic_vector(to_unsigned(
+                    c_mclk_div_lowest +
+                        c_mclk_div_diff * to_integer(unsigned(i_mclk_div)),
+                    G_MCLK_DIV_WIDTH
+                ));
+
+                r_mclk_pulse <= std_logic_vector(resize(
+                    unsigned(r_mclk_cnt) srl 1,
+                    G_MCLK_DIV_WIDTH
+                ));
+            end if;
+        end if;
+    end process p_mclk_adjust;
 
     -- Counter for the master clock. This triggers a one-cycle enable
     -- signal continously

@@ -20,7 +20,8 @@ end entity ctrl_main;
 
 architecture behaviour of ctrl_main is
     signal r_cdc_data: std_logic_vector(i_sub_data'range);
-    signal r_cdc_rdy: std_logic;
+    signal r_cdc_rdy1: std_logic;
+    signal r_cdc_rdy2: std_logic;
 
     signal r_sub_data: std_logic_vector(i_sub_data'range);
     signal r_sub_rdy: std_logic;
@@ -38,11 +39,19 @@ begin
             if i_rst_n = '0' then
                 r_sub_rdy <= '0';
             else
-                r_sub_rdy <= '1' when (r_cdc_rdy = '1' and r_sub_rdy = '0')
-                             else '0';
+                r_sub_rdy <= '0';
+
+                -- Only when RDY2 is low and RDY1 is high, that is,
+                -- when RDY is about to go high. This ensures that
+                -- it is only held high for one clock cycle.
+                if r_cdc_rdy2 = '0' and r_cdc_rdy1 = '1' then
+                    r_sub_rdy <= '1';
+                end if;
+
                 r_sub_data <= r_cdc_data;
 
-                r_cdc_rdy <= i_sub_rdy;
+                r_cdc_rdy1 <= i_sub_rdy;
+                r_cdc_rdy2 <= r_cdc_rdy1;
                 r_cdc_data <= i_sub_data;
             end if;
         end if;

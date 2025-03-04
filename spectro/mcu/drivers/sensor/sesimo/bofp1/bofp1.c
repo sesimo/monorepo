@@ -82,7 +82,7 @@ static uint32_t bofp1_psc_freq(const struct device *dev)
 {
         const struct bofp1_cfg *cfg = dev->config;
 
-        return bofp1_mclk_freq(dev) / cfg->psc;
+        return bofp1_mclk_freq(dev) / (cfg->psc + 1);
 }
 
 static uint8_t bofp1_clkdiv_packed(uint8_t clkdiv, uint8_t psc)
@@ -117,12 +117,12 @@ static int bofp1_set_sample_freq(const struct device *dev, uint32_t freq)
 
 static uint8_t bofp1_sh_div(const struct device *dev, uint32_t freq)
 {
-        return bofp1_psc_freq(dev) / freq;
+        return (bofp1_psc_freq(dev) / freq) - 1;
 }
 
 static uint32_t bofp1_integration_time(const struct device *dev, uint8_t div)
 {
-        return 1000000000UL / (bofp1_psc_freq(dev) / div);
+        return 1000000000UL / (bofp1_psc_freq(dev) / (div + 1));
 }
 
 static int bofp1_set_integration_time(const struct device *dev,
@@ -134,6 +134,13 @@ static int bofp1_set_integration_time(const struct device *dev,
         struct bofp1_data *data = dev->data;
 
         freq = 1000000000UL / time_ns;
+        if (freq > bofp1_psc_freq(dev)) {
+                LOG_ERR("Integration time frequency must be lower than "
+                        "prescaled frequency. Consider adjusting the "
+                        "prescaler");
+                return -EINVAL;
+        }
+
         div = bofp1_sh_div(dev, freq);
 
         status = bofp1_write_reg(dev, BOFP1_REG_CCD_SH, div);

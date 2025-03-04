@@ -40,7 +40,9 @@ ENV VIRTUAL_ENV=${HOME}/venv
 
 WORKDIR ${WORKDIR}
 
-#RUN /tmp/setup.sh
+RUN /tmp/setup.sh
 
-#SHELL [ "/bin/bash", "/tmp/entrypoint.sh", "/bin/bash", "-c" ]
-#ENTRYPOINT [ "/bin/bash", "/tmp/entrypoint.sh" ]
+SHELL [ "/tmp/entrypoint.sh", "/bin/bash", "-c" ]
+ENTRYPOINT [ "/tmp/entrypoint.sh" ]
+
+CMD [ "/bin/bash" ]

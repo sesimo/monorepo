@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 workdir=_work
-base=${BASE-poky}
+base=${BASE-openstlinux}
 
 mkdir -p $workdir
 

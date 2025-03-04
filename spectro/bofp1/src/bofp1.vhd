@@ -12,7 +12,6 @@ entity bofp1 is
     );
     port (
         i_clk: in std_logic;
-        i_rst: in std_logic;
 
         o_ccd_sh: out std_logic;
         o_ccd_mclk: out std_logic;
@@ -39,7 +38,9 @@ end entity bofp1;
 architecture structural of bofp1 is
     signal r_clk_main: std_logic;
 
+    signal r_rst: std_logic;
     signal r_rst_n: std_logic;
+    signal r_rst_en: std_logic;
 
     signal r_ccd_start: std_logic; -- Passed to control module
     signal r_ccd_data_rdy: std_logic;
@@ -89,13 +90,23 @@ architecture structural of bofp1 is
         );
     end component clk_wizard;
 begin
-    r_rst_n <= not i_rst;
+    r_rst_n <= not r_rst;
     o_spi_main_sclk <= r_adc_spi_sclk;
+
+    u_reset: entity work.reset(rtl)
+        generic map(
+            G_CYC_COUNT => 4
+        )
+        port map(
+            i_clk => i_clk,
+            i_en => r_rst_en,
+            o_rst => r_rst
+        );
 
     u_clk: clk_wizard
         port map(
             clk_in1 => i_clk,
-            reset => i_rst,
+            reset => r_rst,
             main => r_clk_main,
             sclk_adc => r_adc_spi_sclk
         );
@@ -148,7 +159,7 @@ begin
     );
 
     u_fifo_data: fifo_data port map (
-        rst => i_rst,
+        rst => r_rst,
         wr_clk => r_clk_main,
         rd_clk => i_spi_sub_sclk,
         wr_en => r_adc_spi_rdy,
@@ -163,6 +174,7 @@ begin
         i_clk => r_clk_main,
         i_rst_n => r_rst_n,
         o_ccd_sample => r_ccd_start,
+        o_rst => r_rst_en,
 
         i_sclk => i_spi_sub_sclk,
         i_cs_n => i_spi_sub_cs_n,

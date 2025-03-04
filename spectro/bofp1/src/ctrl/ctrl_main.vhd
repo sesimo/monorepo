@@ -14,6 +14,7 @@ entity ctrl_main is
         i_sub_rdy: in std_logic;
 
         o_ccd_sample: out std_logic;
+        o_rst: out std_logic;
         o_regmap: out t_regmap
     );
 end entity ctrl_main;
@@ -28,21 +29,10 @@ architecture behaviour of ctrl_main is
 
     signal r_sub_count: integer range 0 to 3;
 
-    signal r_rst_en: std_logic;
-
     attribute dont_touch: string;
     attribute dont_touch of r_sub_data: signal is "true";
     attribute dont_touch of r_cdc_data: signal is "true";
 begin
-    u_reset: entity work.reset(rtl)
-        generic map(
-            G_CYC_COUNT => 4
-        )
-        port map(
-            i_clk => i_clk,
-            i_en => r_rst_en
-        );
-
     -- Cross clock domain with the sub data and the sub ready signal
     p_cdc: process(i_clk) is
     begin
@@ -74,7 +64,7 @@ begin
     begin
         if rising_edge(i_clk) then
             o_ccd_sample <= '0';
-            r_rst_en <= '0';
+            o_rst <= '0';
 
             if i_rst_n = '0' then
                 r_sub_count <= 0;
@@ -116,7 +106,7 @@ begin
                                 o_regmap.shdiv <= v_octet;
 
                             when REG_RESET =>
-                                r_rst_en <= '1';
+                                o_rst <= '1';
 
                             when others => null;
 

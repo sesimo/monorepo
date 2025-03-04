@@ -10,6 +10,7 @@ entity ctrl is
         i_clk: in std_logic;
         i_rst_n: in std_logic;
         o_ccd_sample: out std_logic;
+        o_rst: out std_logic;
 
         i_sclk: in std_logic;
         i_cs_n: in std_logic;
@@ -34,6 +35,7 @@ begin
             i_clk => i_clk,
             i_rst_n => i_rst_n,
             o_ccd_sample => o_ccd_sample,
+            o_rst => o_rst,
 
             i_sub_data => r_sub_data,
             i_sub_rdy => r_sub_rdy,

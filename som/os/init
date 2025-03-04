@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+
+workdir=_work
+base=${BASE-openstlinux}
+
+mkdir -p $workdir
+
+docker build --build-arg BASE=$base -t som_os-$base .
+docker run --privileged \
+    -v ~/.gitconfig:/etc/gitconfig \
+    --mount type=bind,src=$(pwd),target=/home/ubuntu/work \
+    -it som_os-$base

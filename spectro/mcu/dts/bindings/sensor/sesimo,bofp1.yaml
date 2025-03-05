@@ -29,4 +29,22 @@ properties:
     type: int
     default: 20000
     description: |
-      Set integration time (in nanoseconds).
+      Set integration time (in nanoseconds). The integration time is determined
+      by the periodicity of the SH signal on the FPGA. The frequency of this
+      signal is given by `f = MCLK/((PSC+1) * SH)`, that is, it is
+      dependent on both the MCLK frequency and the PSC value. The integration
+      time attribute only adjusts the SH value, so MCLK and PSC may need
+      to be manually adjusted to obtain the best possible frequnecy.
+
+
+  busy-gpios:
+    description: |
+      GPIO for indicating if the CCD is busy
+    type: phandle-array
+    required: true
+
+  fifo-wmark-gpios:
+    description: |
+      FIFO watermark GPIO (more than 256 elements in the FIFO)
+    type: phandle-array
+    required: true

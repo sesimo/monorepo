@@ -1,26 +1,162 @@
 
+#include <zephyr/rtio/rtio.h>
 #include <zephyr/rtio/work.h>
+#include <zephyr/logging/log.h>
 #include <zephyr/drivers/sensor.h>
 
 #include "bofp1.h"
+
+LOG_MODULE_DECLARE(sesimo_bofp1);
+
+#define READ_CHUNK_SIZE (256 * sizeof(uint16_t))
+
+static inline size_t bofp1_frame_size(void)
+{
+        return BOFP1_NUM_ELEMENTS_TOTAL * sizeof(uint16_t);
+}
 
 static void bofp1_submit_fetch(struct rtio_iodev_sqe *iodev_sqe)
 {
         int status;
         const struct sensor_read_config *config = iodev_sqe->sqe.iodev->data;
         const struct device *dev = config->sensor;
+        struct bofp1_data *data = dev->data;
+        struct rtio_sqe *sqe;
+        uint8_t reg;
+        size_t real_len;
 
-        status = bofp1_write_reg(dev, BOFP1_REG_SAMPLE, 0);
+        status = bofp1_enable_read(dev);
         if (status != 0) {
                 rtio_iodev_sqe_err(iodev_sqe, status);
                 return;
         }
 
-        rtio_iodev_sqe_ok(iodev_sqe, status);
+        status = rtio_sqe_rx_buf(iodev_sqe, bofp1_frame_size(),
+                                 bofp1_frame_size(), &data->wr_buf, &real_len);
+        if (status != 0) {
+                rtio_iodev_sqe_err(iodev_sqe, status);
+                return;
+        }
+
+        sqe = rtio_sqe_acquire(data->rtio_ctx);
+        if (sqe == NULL) {
+                rtio_iodev_sqe_err(iodev_sqe, -ENOMEM);
+                return;
+        }
+
+        reg = BOFP1_WRITE_REG(BOFP1_REG_SAMPLE);
+        rtio_sqe_prep_tiny_write(sqe, data->iodev_bus, RTIO_PRIO_NORM, &reg,
+                                 sizeof(reg), NULL);
+
+        data->iodev_sqe = iodev_sqe;
+        data->wr_index = 0;
+
+        rtio_submit(data->rtio_ctx, 0);
 }
 
-extern void bofp1_submit(const struct device *dev,
-                         struct rtio_iodev_sqe *iodev_sqe)
+static void bofp1_finish(const struct device *dev, int status)
+{
+        struct bofp1_data *data = dev->data;
+        struct rtio_iodev_sqe *sqe = data->iodev_sqe;
+
+        bofp1_disable_read(dev);
+
+        data->iodev_sqe = NULL;
+        data->wr_buf = NULL;
+
+        if (status == 0) {
+                rtio_iodev_sqe_ok(sqe, 0);
+        } else {
+                rtio_iodev_sqe_err(sqe, status);
+        }
+
+        LOG_INF("done");
+}
+
+static void bofp1_rtio_finish(struct rtio *r, const struct rtio_sqe *sqe,
+                              void *dev_arg)
+{
+        ARG_UNUSED(r);
+        ARG_UNUSED(sqe);
+
+        bofp1_finish(dev_arg, 0);
+}
+
+static void bofp1_data_read(const struct device *dev)
+{
+        struct bofp1_data *data = dev->data;
+        size_t size;
+        size_t index;
+        uint8_t reg;
+        struct rtio_sqe *wr_reg;
+        struct rtio_sqe *rd_data;
+        struct rtio_sqe *cb_finish;
+        k_spinlock_key_t key;
+
+        key = k_spin_lock(&data->lock);
+
+        bofp1_disable_read(dev);
+
+        index = data->wr_index;
+        if (index >= bofp1_frame_size()) {
+                LOG_WRN("duplicate read detected");
+                goto exit;
+        }
+
+        size = bofp1_frame_size() - index;
+        if (size > READ_CHUNK_SIZE) {
+                size = READ_CHUNK_SIZE;
+        }
+
+        LOG_INF("index: %zu, size: %zu", index, size);
+
+        wr_reg = rtio_sqe_acquire(data->rtio_ctx);
+        rd_data = rtio_sqe_acquire(data->rtio_ctx);
+
+        if (wr_reg == NULL || rd_data == NULL) {
+                bofp1_finish(dev, -ENOMEM);
+                goto exit;
+        }
+
+        reg = BOFP1_READ_REG(BOFP1_REG_STREAM);
+        rtio_sqe_prep_tiny_write(wr_reg, data->iodev_bus, RTIO_PRIO_HIGH, &reg,
+                                 sizeof(reg), NULL);
+        rtio_sqe_prep_read(rd_data, data->iodev_bus, RTIO_PRIO_HIGH,
+                           data->wr_buf + index, size, NULL);
+
+        wr_reg->flags = RTIO_SQE_TRANSACTION;
+
+        data->wr_index += size;
+        if (data->wr_index >= bofp1_frame_size()) {
+                /* Finish up */
+                cb_finish = rtio_sqe_acquire(data->rtio_ctx);
+                if (cb_finish == NULL) {
+                        bofp1_finish(dev, -ENOMEM);
+                        goto exit;
+                }
+
+                rd_data->flags = RTIO_SQE_CHAINED;
+
+                rtio_sqe_prep_callback(cb_finish, bofp1_rtio_finish,
+                                       (void *)dev, NULL);
+        }
+
+        rtio_submit(data->rtio_ctx, 0);
+        bofp1_enable_read(dev);
+
+exit:
+        k_spin_unlock(&data->lock, key);
+}
+
+static void bofp1_data_read_work(struct rtio_iodev_sqe *iodev_sqe)
+{
+        const struct sensor_read_config *config = iodev_sqe->sqe.iodev->data;
+        const struct device *dev = config->sensor;
+
+        bofp1_data_read(dev);
+}
+
+void bofp1_submit(const struct device *dev, struct rtio_iodev_sqe *iodev_sqe)
 {
         struct rtio_work_req *work;
         const struct sensor_read_config *config = iodev_sqe->sqe.iodev->data;
@@ -29,4 +165,12 @@ extern void bofp1_submit(const struct device *dev,
 
         work = rtio_work_req_alloc();
         rtio_work_req_submit(work, iodev_sqe, bofp1_submit_fetch);
+}
+
+void bofp1_rtio_read(const struct device *dev)
+{
+        struct bofp1_data *data = dev->data;
+        struct rtio_work_req *req = rtio_work_req_alloc();
+
+        rtio_work_req_submit(req, data->iodev_sqe, bofp1_data_read_work);
 }

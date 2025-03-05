@@ -3,6 +3,7 @@
 #include <zephyr/drivers/sensor.h>
 #include <zephyr/drivers/spi.h>
 #include <zephyr/logging/log.h>
+#include <zephyr/drivers/gpio.h>
 
 #include <drivers/sensor/bofp1.h>
 
@@ -36,11 +37,12 @@ int bofp1_access(const struct device *dev, bool write, uint8_t addr, void *data,
                 .count = ARRAY_SIZE(bufs),
         };
 
-        reg = addr << BOFP1_REG_OFFSET;
         if (write) {
-                reg |= BOFP1_REG_BIT_WR;
+                reg = BOFP1_WRITE_REG(addr);
 
                 return spi_write_dt(&cfg->bus, &tx_set);
+        } else {
+                reg = BOFP1_READ_REG(addr);
         }
 
         return spi_transceive_dt(&cfg->bus, &tx_set, &rx_set);
@@ -152,6 +154,11 @@ static int bofp1_set_integration_time(const struct device *dev,
         return 0;
 }
 
+static int bofp1_reset(const struct device *dev)
+{
+        return bofp1_write_reg(dev, BOFP1_REG_RESET, 0);
+}
+
 static int bofp1_attr_get(const struct device *dev, enum sensor_channel chan,
                           enum sensor_attribute attr, struct sensor_value *val)
 {
@@ -195,6 +202,68 @@ static int bofp1_attr_set(const struct device *dev, enum sensor_channel chan,
         return 0;
 }
 
+int bofp1_enable_read(const struct device *dev)
+{
+        int status;
+        const struct bofp1_cfg *cfg = dev->config;
+
+        status = gpio_pin_interrupt_configure_dt(&cfg->busy_gpios,
+                                                 GPIO_INT_EDGE_TO_INACTIVE);
+        if (status != 0) {
+                return status;
+        }
+
+        status = gpio_pin_interrupt_configure_dt(&cfg->fifo_w_gpios,
+                                                 GPIO_INT_EDGE_TO_ACTIVE);
+
+        return status;
+}
+
+int bofp1_disable_read(const struct device *dev)
+{
+        int status;
+        const struct bofp1_cfg *cfg = dev->config;
+
+        status = gpio_pin_interrupt_configure_dt(&cfg->busy_gpios,
+                                                 GPIO_INT_DISABLE);
+        if (status != 0) {
+                return status;
+        }
+
+        status = gpio_pin_interrupt_configure_dt(&cfg->fifo_w_gpios,
+                                                 GPIO_INT_DISABLE);
+
+        return status;
+}
+
+static void bofp1_busy_fall_cb(const struct device *gpio,
+                               struct gpio_callback *cb, gpio_port_pins_t pins)
+{
+        struct bofp1_data *data;
+
+        ARG_UNUSED(gpio);
+        ARG_UNUSED(pins);
+
+        LOG_DBG("sampling done");
+
+        data = CONTAINER_OF(cb, struct bofp1_data, busy_fall_cb);
+        bofp1_rtio_read(data->dev);
+}
+
+static void bofp1_fifo_wmark_cb(const struct device *gpio,
+                                struct gpio_callback *cb, gpio_port_pins_t pins)
+{
+        struct bofp1_data *data;
+
+        ARG_UNUSED(gpio);
+        ARG_UNUSED(pins);
+
+        LOG_DBG("fifo watermark hit");
+
+        data = CONTAINER_OF(cb, struct bofp1_data, fifo_w_cb);
+        bofp1_rtio_read(data->dev);
+}
+
 static DEVICE_API(sensor, bofp1_api) = {
         .attr_get = bofp1_attr_get,
         .attr_set = bofp1_attr_set,
@@ -202,13 +271,55 @@ static DEVICE_API(sensor, bofp1_api) = {
         .get_decoder = bofp1_get_decoder,
 };
 
+static int bofp1_init_gpio(const struct gpio_dt_spec *spec,
+                           gpio_callback_handler_t cb_func,
+                           struct gpio_callback *cb, uint8_t pin)
+{
+        int status;
+
+        if (!gpio_is_ready_dt(spec)) {
+                return -EBUSY;
+        }
+
+        status = gpio_pin_configure_dt(spec, GPIO_INPUT);
+        if (status != 0) {
+                return status;
+        }
+
+        gpio_init_callback(cb, cb_func, pin);
+        status = gpio_add_callback_dt(spec, cb);
+        if (status != 0) {
+                return status;
+        }
+
+        return status;
+}
+
 static int bofp1_init(const struct device *dev)
 {
         int status;
         const struct bofp1_cfg *cfg = dev->config;
+        struct bofp1_data *data = dev->data;
 
         if (!spi_is_ready_dt(&cfg->bus)) {
                 return -EBUSY;
+        }
+
+        status = bofp1_init_gpio(&cfg->busy_gpios, bofp1_busy_fall_cb,
+                                 &data->busy_fall_cb, BIT(cfg->busy_gpios.pin));
+        if (status != 0) {
+                return status;
+        }
+
+        status = bofp1_init_gpio(&cfg->fifo_w_gpios, bofp1_fifo_wmark_cb,
+                                 &data->fifo_w_cb, BIT(cfg->fifo_w_gpios.pin));
+        if (status != 0) {
+                return status;
+        }
+
+        status = bofp1_reset(dev);
+        if (status != 0) {
+                return status;
         }
 
         status = bofp1_set_sample_div(dev, cfg->clkdiv_dt);
@@ -226,18 +337,29 @@ static int bofp1_init(const struct device *dev)
         return 0;
 }
 
+#define BOFP1_SPI_OP    (SPI_MODE_CPHA | SPI_WORD_SET(8) | SPI_TRANSFER_MSB)
+#define BOFP1_SPI_DELAY (0)
+
 #define BOFP1_INIT(inst_)                                                      \
+        SPI_DT_IODEV_DEFINE(bofp1_iodev_##inst_##__, DT_DRV_INST(inst_),       \
+                            BOFP1_SPI_OP, BOFP1_SPI_DELAY);                    \
+        RTIO_DEFINE(bofp1_rtio_##inst_##__, 64, 64);                           \
         static const struct bofp1_cfg bofp1_cfg_##inst_##__ = {                \
-                .bus = SPI_DT_SPEC_INST_GET(inst_,                             \
-                                            SPI_MODE_CPHA | SPI_WORD_SET(8) |  \
-                                                    SPI_TRANSFER_MSB,          \
-                                            0),                                \
+                .bus = SPI_DT_SPEC_INST_GET(inst_, BOFP1_SPI_OP,               \
+                                            BOFP1_SPI_DELAY),                  \
                 .psc = DT_INST_PROP(inst_, prescaler),                         \
                 .clkdiv_dt = DT_INST_PROP(inst_, clkdiv),                      \
                 .integration_time_dt = DT_INST_PROP(inst_, integration_time),  \
+                .busy_gpios = GPIO_DT_SPEC_INST_GET(inst_, busy_gpios),        \
+                .fifo_w_gpios =                                                \
+                        GPIO_DT_SPEC_INST_GET(inst_, fifo_wmark_gpios),        \
                 .clock_frequency = DT_INST_PROP(inst_, clock_frequency),       \
         };                                                                     \
-        static struct bofp1_data bofp1_data_##inst_##__;                       \
+        static struct bofp1_data bofp1_data_##inst_##__ = {                    \
+                .iodev_bus = &bofp1_iodev_##inst_##__,                         \
+                .rtio_ctx = &bofp1_rtio_##inst_##__,                           \
+                .dev = DEVICE_DT_INST_GET(inst_),                              \
+        };                                                                     \
         DEVICE_DT_INST_DEFINE(inst_, bofp1_init, NULL,                         \
                               &bofp1_data_##inst_##__, &bofp1_cfg_##inst_##__, \
                               POST_KERNEL, CONFIG_SENSOR_INIT_PRIORITY,        \

@@ -6,3 +6,4 @@ config SENSOR_BOFP1
     imply SPI
     imply RTIO
     imply SENSOR_ASYNC_API
+    imply SPI_RTIO

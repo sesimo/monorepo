@@ -35,6 +35,12 @@ static int add_config(enum usbd_speed speed, struct usbd_config_node *conf)
                 return status;
         }
 
+        status = usbd_device_set_code_triple(&bomc1_usb, speed,
+                                             USB_BCC_MISCELLANEOUS, 2, 1);
+        if (status != 0) {
+                return status;
+        }
+
         return status;
 }
 

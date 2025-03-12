@@ -71,16 +71,19 @@ int spectro_stream_read(void *buf_arg, size_t size_arg, size_t *real_size)
                 goto exit;
         }
 
-        while (size >= sizeof(uint16_t) && frames > 0) {
+        while (size >= sizeof(uint16_t) && decode_ctx.fit < frames) {
                 status = sensor_decode(&decode_ctx, &data, 1);
-                if (status < 0) {
+                if (status <= 0) {
+                        /* Checking if empty in the loop condition, so this
+                         * should not return 0. */
+                        if (status == 0) {
+                                status = -ENODATA;
+                        }
                         goto exit;
                 }
 
                 value = convert_voltage(data.readings[0].voltage, data.shift);
                 sys_put_be16(value, buf);
-
-                frames -= MIN(status, frames);
 
                 size -= sizeof(uint16_t);
                 buf += sizeof(uint16_t);
@@ -97,7 +100,7 @@ exit:
                 return status;
         }
 
-        return frames > 0;
+        return decode_ctx.fit < frames;
 }
 
 int spectro_sample(spectro_data_rdy_cb cb, void *user_arg)

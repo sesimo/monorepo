@@ -14,9 +14,8 @@ LOG_MODULE_REGISTER(bomc1_usb);
 #define BOMC1_VRQ_SPECTRO_READ (0x1) /* Begin CCD read */
 
 #define BOMC1_TX_ENABLED (0)
-#define BOMC1_TX_ZLP     (1)
-#define BOMC1_TX_BUSY    (2)
-#define BOMC1_TX_MORE    (3)
+#define BOMC1_TX_BUSY    (1)
+#define BOMC1_TX_MORE    (2)
 
 struct bomc1_usb_desc {
         struct usb_association_descriptor iad;
@@ -89,28 +88,20 @@ static void tx_handler(struct k_work *work)
                 return;
         }
 
-        atomic_clear_bit(&ctx->state, BOMC1_TX_MORE);
+        status = spectro_stream_read(buf->data, buf->size, &real_size);
+        if (status < 0) {
+                LOG_ERR("read failed: %i", status);
 
-        if (!atomic_test_and_clear_bit(&ctx->state, BOMC1_TX_ZLP)) {
-                status = spectro_stream_read(buf->data, buf->size, &real_size);
-                if (status < 0) {
-                        LOG_ERR("read failed: %i", status);
+                net_buf_unref(buf);
+                return;
+        }
 
-                        net_buf_unref(buf);
-                        return;
-                }
+        /* Add read size to the buffer */
+        net_buf_add(buf, real_size);
 
-                buf->len = (uint8_t)real_size;
-
-                /* Next needs to be a zero-length packet */
-                if (status == 0 && buf->len % mps == 0) {
-                        atomic_set_bit(&ctx->state, BOMC1_TX_ZLP);
-                } else if (status > 0) {
-                        atomic_set_bit(&ctx->state, BOMC1_TX_MORE);
-                }
+        if (status > 0) {
+                atomic_set_bit(&ctx->state, BOMC1_TX_MORE);
         } else {
-                buf->len = 0;
-                atomic_clear_bit(&ctx->state, BOMC1_TX_ZLP);
                 atomic_clear_bit(&ctx->state, BOMC1_TX_MORE);
         }
 
@@ -119,7 +110,6 @@ static void tx_handler(struct k_work *work)
                 LOG_ERR("enqueue failed: %i", status);
 
                 net_buf_unref(buf);
-                atomic_clear_bit(&ctx->state, BOMC1_TX_ZLP);
                 atomic_clear_bit(&ctx->state, BOMC1_TX_MORE);
                 atomic_clear_bit(&ctx->state, BOMC1_TX_BUSY);
         }
@@ -154,8 +144,7 @@ static int bomc1_usbd_request(struct usbd_class_data *const c_data,
         if (ep == get_bulk_in(c_data)) {
                 atomic_clear_bit(&ctx->state, BOMC1_TX_BUSY);
 
-                if (atomic_test_bit(&ctx->state, BOMC1_TX_ZLP) ||
-                    atomic_test_bit(&ctx->state, BOMC1_TX_MORE)) {
+                if (atomic_test_bit(&ctx->state, BOMC1_TX_MORE)) {
                         (void)k_work_schedule_for_queue(
                                 &ctx->workq, &ctx->tx_work, K_TICKS(1));
                 }

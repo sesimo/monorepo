@@ -1,2 +1,2 @@
 
-obj-m+=$(SRC)/drv-iio.c $(SRC)/module.c
+SOURCES += $(SRC)/module.c $(SRC)/drv-iio.c

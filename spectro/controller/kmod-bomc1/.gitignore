@@ -6,3 +6,4 @@
 *.symvers
 compile_commands.json
 modules.order
+build/

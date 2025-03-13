@@ -1,0 +1,10 @@
+
+SRC_DIR := $(src)/src
+
+# Populated by subdirectory makefiles
+SOURCES =
+
+include $(SRC_DIR)/Makefile
+
+obj-m += bomc1.o
+bomc1-objs := $(patsubst %.c,%.o,$(SOURCES))

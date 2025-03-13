@@ -1,2 +1,5 @@
 
-SOURCES += $(SRC)/module.c $(SRC)/drv-iio.c
+SOURCES += \
+	src/module.c \
+	src/drv-iio.c
+

@@ -2,6 +2,8 @@
 #include <linux/module.h>
 #include <linux/init.h>
 
+#include "module.h"
+
 static int __init bomc1_init(void)
 {
         pr_info("BOCM1 loaded");
@@ -15,6 +17,6 @@ static void __exit bomc1_exit(void)
 module_init(bomc1_init);
 module_exit(bomc1_exit);
 
-MODULE_AUTHOR("Sigmund Klåpbakken");
-MODULE_LICENSE("Proprietary");
+MODULE_AUTHOR(SSM_MOD_AUTHOR);
+MODULE_LICENSE(SSM_MOD_LICENSE);
 MODULE_DESCRIPTION("SESIMO BOMC1 driver module");

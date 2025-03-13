@@ -11,7 +11,7 @@
 
 #define SPECTRO_DEV DT_CHOSEN(sesimo_bofp1)
 
-LOG_MODULE_REGISTER(spectro);
+LOG_MODULE_REGISTER(spectro, LOG_LEVEL_DBG);
 
 static uint16_t spectro_buf[3694];
 
@@ -34,11 +34,19 @@ K_MSGQ_DEFINE(msgq, sizeof(struct spectro_q_entry), 2, 1);
 
 /** @brief Convert @p src with shift @p m to a float */
 #define Q31_TO_F(src, m) ((float)(((int64_t)src) << m) / (float)(1U << 31))
+#define F_TO_31(src, shift)                                                    \
+        ((q31_t)CLAMP(((int64_t)(src * (1 << 31)) << shift), INT32_MIN,        \
+                      INT32_MAX))
 
 /** @brief Converts the voltage in @p to millivolts */
 static uint16_t convert_voltage(q31_t q, uint8_t shift)
 {
-        return (uint16_t)(Q31_TO_F(q, shift) * 1000);
+        static int val = 0;
+        return val++;
+
+        int64_t millivolts = ((int64_t)(q * INT64_C(1000)) << shift);
+
+        return millivolts / (1 << 31);
 }
 
 int spectro_stream_read(void *buf_arg, size_t size_arg, size_t *real_size)
@@ -120,6 +128,7 @@ static void aq_thread(void *p1, void *p2, void *p3)
 
         for (;;) {
                 (void)k_msgq_get(&msgq, &entry, K_FOREVER);
+                LOG_DBG("acquiring sample");
 
                 (void)k_mutex_lock(&lock, K_FOREVER);
 
@@ -128,9 +137,14 @@ static void aq_thread(void *p1, void *p2, void *p3)
 
                 /* Reset frame iterator */
                 decode_ctx.fit = 0;
+#if 0
+
 
                 status = sensor_read(&iodev, &rtio_ctx, (uint8_t *)spectro_buf,
                                      sizeof(spectro_buf));
+#else
+                status = 0;
+#endif
                 (void)k_mutex_unlock(&lock);
 
                 if (status != 0) {
@@ -138,9 +152,10 @@ static void aq_thread(void *p1, void *p2, void *p3)
                         continue;
                 }
 
+                LOG_DBG("sample completed");
                 entry.cb(entry.user_arg);
         }
 }
 
-K_THREAD_DEFINE(aq_thread_handle, 256, aq_thread, NULL, NULL, NULL,
+K_THREAD_DEFINE(aq_thread_handle, 512, aq_thread, NULL, NULL, NULL,
                 CONFIG_SYSTEM_WORKQUEUE_PRIORITY + 1, 0, 0);

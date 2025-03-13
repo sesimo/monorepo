@@ -1,12 +1,16 @@
 
 #include <zephyr/drivers/sensor.h>
+#include <zephyr/sys/byteorder.h>
 
 #include "bofp1.h"
 
 static q31_t to_q31(uint16_t value, int shift)
 {
-        int64_t inter =
-                ((int64_t)value * (1 << 31)) / ((1 << shift) * INT64_C(1000));
+        /* Convert to Q31 format and divide the millivolts into volts
+         * TODO: Move this conversion to the FPGA */
+        int64_t upscaled = (int64_t)value * (1ULL << 31);
+        int64_t div = (1 << shift) * INT64_C(1000);
+        int64_t inter = upscaled / div;
 
         return CLAMP(inter, INT32_MIN, INT32_MAX);
 }
@@ -15,6 +19,8 @@ static int bofp1_decode(const uint8_t *buf, struct sensor_chan_spec chan,
                         uint32_t *fit, uint16_t max_count, void *data_out)
 {
         struct sensor_q31_data *data = data_out;
+        const uint8_t *ptr;
+        uint16_t value;
 
         if (chan.chan_type != SENSOR_CHAN_VOLTAGE || chan.chan_idx != 0) {
                 return -ENOTSUP;
@@ -24,9 +30,11 @@ static int bofp1_decode(const uint8_t *buf, struct sensor_chan_spec chan,
                 return 0;
         }
 
-        static int volt = 0;
-        data->shift = 0;
-        data->readings[0].voltage = to_q31(volt++, data->shift);
+        ptr = buf + (BOFP1_NUM_ELEMENTS_DUMMY_LEFT + *fit) * sizeof(uint16_t);
+        value = sys_get_be16(ptr);
+
+        data->shift = 10;
+        data->readings[0].voltage = to_q31(value, data->shift);
 
         *fit += 1;
 

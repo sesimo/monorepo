@@ -29,8 +29,11 @@
 #define BOFP1_PSC_INDEX    (3)
 #define BOFP1_CLKDIV_INDEX (0)
 
-#define BOFP1_NUM_ELEMENTS_REAL  (3648)
-#define BOFP1_NUM_ELEMENTS_DUMMY (46)
+#define BOFP1_NUM_ELEMENTS_REAL        (3648)
+#define BOFP1_NUM_ELEMENTS_DUMMY_LEFT  (32)
+#define BOFP1_NUM_ELEMENTS_DUMMY_RIGHT (14)
+#define BOFP1_NUM_ELEMENTS_DUMMY                                               \
+        (BOFP1_NUM_ELEMENTS_DUMMY_LEFT + BOFP1_NUM_ELEMENTS_DUMMY_RIGHT)
 #define BOFP1_NUM_ELEMENTS_TOTAL                                               \
         (BOFP1_NUM_ELEMENTS_REAL + BOFP1_NUM_ELEMENTS_DUMMY)
 

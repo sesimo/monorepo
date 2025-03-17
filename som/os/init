@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
 
+here=$(dirname $0)
+
 workdir=_work
 base=${BASE-openstlinux}
 
 mkdir -p $workdir
 
-docker build --build-arg BASE=$base -t som_os-$base .
-docker run --privileged \
+docker build -t som_os-$base .
+docker run --entrypoint "$here/entrypoint.sh" --privileged \
     -v ~/.gitconfig:/etc/gitconfig \
     --mount type=bind,src=$(pwd),target=/home/ubuntu/work \
-    -it som_os-$base
+    -it som_os-$base /bin/bash

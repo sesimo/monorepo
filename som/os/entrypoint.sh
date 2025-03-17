@@ -1,5 +1,11 @@
 #!/bin/bash
 
+here=$(dirname $0)
+
+if [ ! -d "$here/.repo" ]; then
+    ./repo-sync.sh
+fi
+
 cmd=$1
 shift
 

@@ -1,48 +1,44 @@
-FROM ubuntu:22.04
-
-ARG BASE=poky
+FROM ubuntu:22.04 AS yocto-build-base
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV HOME=/home/ubuntu
 
 ENV WORKDIR=${HOME}/work
 
-COPY docker/packages/${BASE}.txt /tmp/packages.txt
-
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
     locales curl python3 python3-pip python3-venv ssh tree meld geany \
-    make xsltproc docbook-utils fop dblatex xmlto file \
-    $(cat /tmp/packages.txt)
+    make xsltproc docbook-utils fop dblatex xmlto file sudo
 
 RUN locale-gen "en_US.UTF-8"
 
+# Install repo utility
 RUN curl http://commondatastorage.googleapis.com/git-repo-downloads/repo > \
     /bin/repo
-
 RUN chmod +x /bin/repo
 
-COPY docker/entrypoints/${BASE}.sh /tmp/entrypoint.sh
-RUN chmod +x /tmp/entrypoint.sh
-
-COPY docker/setup/${BASE}.sh /tmp/setup.sh
-RUN chmod +x /tmp/setup.sh
-
-RUN useradd -m ubuntu
+# Change user
+RUN adduser --disabled-password ubuntu
+RUN adduser ubuntu sudo
+RUN echo '%sudo ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
 USER ubuntu
 
-COPY requirements.txt ${HOME}/src/requirements.txt
+WORKDIR ${WORKDIR}
 
+# Setup venv
 RUN python3 -m venv ${HOME}/venv
 
 ENV PATH=${HOME}/venv/bin:${PATH}
 ENV VIRTUAL_ENV=${HOME}/venv
 
-WORKDIR ${WORKDIR}
+# STM32MP specific
+FROM yocto-build-base AS yocto-build-st
 
-RUN /tmp/setup.sh
-
-SHELL [ "/tmp/entrypoint.sh", "/bin/bash", "-c" ]
-ENTRYPOINT [ "/tmp/entrypoint.sh" ]
-
-CMD [ "/bin/bash" ]
+USER root
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    bsdmainutils build-essential chrpath cpio debianutils diffstat gawk \
+    gcc-multilib git git-lfs iputils-ping libegl1-mesa libgmp-dev libmpc-dev \
+    libsdl1.2-dev libssl-dev libusb-1.0-0 lz4 pylint python3 python3-git \
+    python3-jinja2 python3-pexpect python3-pip socat texinfo unzip wget \
+    xterm xz-utils zstd
+USER ubuntu

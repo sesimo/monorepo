@@ -20,8 +20,6 @@ SOURCES=\
 	src/spi/spi_main.vhd \
 	src/spi/spi_sub.vhd  \
 	src/ctrl/ctrl_common_pkg.vhd \
-	src/ctrl/ctrl_main.vhd \
-	src/ctrl/ctrl_sub.vhd \
 	src/ctrl/ctrl.vhd \
 	src/bofp1.vhd
 

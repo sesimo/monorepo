@@ -48,6 +48,8 @@ begin
             G_DATA_WIDTH => 4
         )
         port map(
+            i_clk => i_clk,
+            i_rst_n => i_rst_n,
             i_sclk => i_sclk,
             i_cs_n => i_cs_n,
 

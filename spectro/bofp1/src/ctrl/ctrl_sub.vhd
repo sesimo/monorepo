@@ -10,6 +10,9 @@ entity ctrl_sub is
         G_DATA_WIDTH: integer
     );
     port (
+        i_clk: in std_logic;
+        i_rst_n: in std_logic;
+
         i_sclk: in std_logic;
         i_cs_n: in std_logic;
 
@@ -41,6 +44,12 @@ architecture behaviour of ctrl_sub is
 
     signal r_shf_count: integer range 0 to 3;
 
+    signal r_rst_mux: boolean;
+
+    signal r_reg: t_reg;
+
+    signal r_fifo_rd: std_logic;
+
     -- Current range of the SPI output shift register
     function cur_shf_range(
         data: std_logic_vector;
@@ -56,6 +65,8 @@ begin
     o_data <= r_in_buf;
     o_rdy <= r_sample_done;
 
+    r_rst_mux <= i_cs_n /= '0' or i_rst_n = '0';
+
     -- TODO: ctrl data
     r_out <= i_fifo_data when r_streaming else (others => '0');
 
@@ -67,6 +78,8 @@ begin
             G_DATA_WIDTH => G_DATA_WIDTH
         )
         port map(
+            i_clk => i_clk,
+            i_rst_n => i_rst_n,
             i_sclk => i_sclk,
             i_cs_n => i_cs_n,
             i_mosi => i_mosi,
@@ -77,37 +90,27 @@ begin
             o_sample_done => r_sample_done
         );
 
-    p_count: process(i_sclk, i_cs_n)
+    p_count: process(i_clk)
     begin
-        if i_cs_n /= '0' then
-            r_shf_count <= 0;
-        elsif falling_edge(i_sclk) then
-            if r_shift_done = '1' then
+        if rising_edge(i_clk) then
+            if r_rst_mux then
+                r_shf_count <= 0;
+            elsif r_shift_done = '1' then
                 r_shf_count <= (r_shf_count + 1) mod 4;
             end if;
         end if;
     end process p_count;
 
-    p_handle: process(i_sclk, i_cs_n)
+    p_handle: process(i_clk)
     begin
-        if i_cs_n /= '0' then
-            r_streaming <= false;
-        elsif rising_edge(i_sclk) then
-            -- When r_sample_one=1, 4 bits have been received from the SPI
-            -- main. This process should determine whether or not to
-            -- forward the data to the main clock domain. If streaming mode
-            -- has already been entered, the received register/command
-            -- is to be discarded.
-            if r_sample_done = '1' and not r_streaming then
-                -- Whenever not in streaming mode, and 4 bits are received,
-                -- they should by default be forwarded to the main clock
-                -- domain. Exceptions to this case will clear o_rdy later
-                -- in this process.
-
-                -- Sample_done=1 and shift count=1, means that the first 4
-                -- bits have been received
+        if rising_edge(i_clk) then
+            if r_rst_mux then
+                r_streaming <= false;
+            elsif r_sample_done = '1' then
                 if r_shf_count = 1 then
-                    case parse_reg(r_in_buf) is
+                    r_reg <= parse_reg(r_in_buf);
+                elsif r_shf_count = 2 and not r_streaming then
+                    case r_reg is
                         when REG_STREAM =>
                             r_streaming <= true;
 
@@ -119,34 +122,47 @@ begin
         end if;
     end process p_handle;
 
-    p_stream: process(i_sclk, i_cs_n)
-        variable v_outdated: boolean := true;
+    p_delay: process(i_clk)
+    begin
+        if rising_edge(i_clk) then
+            o_fifo_rd <= r_fifo_rd;
+        end if;
+    end process p_delay;
+
+    p_stream: process(i_clk)
+        variable v_outdated: boolean;
         variable v_dropped: boolean;
     begin
-        if i_cs_n /= '0' then
-            v_dropped := true;
-            o_fifo_rd <= '0';
-        elsif rising_edge(i_sclk) then
-            o_fifo_rd <= '0';
+        if rising_edge(i_clk) then
+            if r_rst_mux then
+                v_dropped := true;
+                r_fifo_rd <= '0';
 
-            if r_streaming and r_sample_done = '1' then
-                -- When starting the last 4 bits, pop from fifo
-                if r_shf_count = 3 then
-                    -- If the CS line has been dropped and picked up again,
-                    -- and the last stream popped data from FIFO into the register
-                    -- then the previously popped data can be re-used. This will
-                    -- not have been previously shifted out onto the SPI bus
-                    -- since the CS line was dropped.
-                    if not (v_dropped and not v_outdated) then
-                        if i_fifo_empty = '1' then
-                            v_outdated := true;
-                        else
-                            o_fifo_rd <= '1';
-                            v_outdated := false;
+                if i_rst_n = '0' then
+                    v_outdated := true;
+                end if;
+            else 
+                r_fifo_rd <= '0';
+
+                if r_streaming and r_sample_done = '1' then
+                    -- When starting the last 4 bits, pop from fifo
+                    if r_shf_count = 3 then
+                        -- If the CS line has been dropped and picked up again,
+                        -- and the last stream popped data from FIFO into the register
+                        -- then the previously popped data can be re-used. This will
+                        -- not have been previously shifted out onto the SPI bus
+                        -- since the CS line was dropped.
+                        if not (v_dropped and not v_outdated) then
+                            if i_fifo_empty = '1' then
+                                v_outdated := true;
+                            else
+                                r_fifo_rd <= '1';
+                                v_outdated := false;
+                            end if;
                         end if;
-                    end if;
 
-                    v_dropped := false;
+                        v_dropped := false;
+                    end if;
                 end if;
             end if;
         end if;

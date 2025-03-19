@@ -22,7 +22,6 @@ entity spi_common is
         o_out: out std_logic;
 
         i_data: in std_logic_vector(G_DATA_WIDTH-1 downto 0);
-        o_data: out std_logic_vector(G_DATA_WIDTH-1 downto 0);
         o_data_shf: out std_logic_vector(G_DATA_WIDTH-1 downto 0);
 
         o_sample_done: inout std_logic;
@@ -36,7 +35,6 @@ architecture rtl of spi_common is
     signal r_rst_mux: boolean;
 begin
     o_data_shf <= r_sample_shf;
-    o_data <= r_sample_shf when o_sample_done = '1';
 
     r_rst_mux <= i_cs_n /= '0' or i_rst_n = '0';
 

@@ -54,7 +54,7 @@ begin
             o_out => o_mosi,
 
             i_data => i_data,
-            o_data => o_data,
+            o_data_shf => o_data,
 
             o_sample_done => r_sample_done,
             o_shift_done => r_shift_done

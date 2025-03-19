@@ -26,6 +26,9 @@ end entity spi_main;
 architecture rtl of spi_main is
     signal r_cs_n_buf: std_logic;
 
+    signal r_sample_en: std_logic;
+    signal r_shift_en: std_logic;
+
     signal r_sample_done: std_logic;
     signal r_shift_done: std_logic;
 
@@ -40,9 +43,14 @@ begin
             G_DATA_WIDTH => G_DATA_WIDTH
         )
         port map(
-            i_sclk => i_sclk,
-            i_cs_n  => r_cs_n_buf,
+            i_clk => i_clk,
+            i_rst_n => i_rst_n,
+
+            i_sample_en => r_sample_en,
+            i_shift_en => r_shift_en,
+
             i_in => i_miso,
+            i_cs_n => r_cs_n_buf,
             o_out => o_mosi,
 
             i_data => i_data,
@@ -50,6 +58,36 @@ begin
 
             o_sample_done => r_sample_done,
             o_shift_done => r_shift_done
+        );
+
+    -- Detect rising edge, which will be used for shifting
+    -- We assume that the generated SCLK is running on the same base as
+    -- i_clk, and we therefore dont do any clock domain crossing
+    u_edge_shift: entity work.edge_detect(rtl)
+        generic map(
+            C_FROM => '0',
+            C_TO => '1'
+        )
+        port map(
+            i_clk => i_clk,
+            i_rst_n => i_rst_n,
+            i_sig => i_sclk,
+            o_edge => r_shift_en
+        );
+
+    -- Detect falling edge, which will be used for sampling
+    -- We assume that the generated SCLK is running on the same base as
+    -- i_clk, and we therefore dont do any clock domain crossing
+    u_edge_sample: entity work.edge_detect(rtl)
+        generic map(
+            C_FROM => '1',
+            C_TO => '0'
+        )
+        port map(
+            i_clk => i_clk,
+            i_rst_n => i_rst_n,
+            i_sig => i_sclk,
+            o_edge => r_sample_en
         );
 
     p_handle_state: process(i_clk)
@@ -70,7 +108,7 @@ begin
                         end if;
                     when S_STARTING =>
                         -- Pull CS low on the first falling edge detected
-                        if i_sclk = '0' and i_sclk /= v_sclk_last then
+                        if r_sample_en = '1' then
                             r_cs_n_buf <= '0';
                             r_state <= S_RUNNING;
                         end if;

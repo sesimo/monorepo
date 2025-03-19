@@ -11,9 +11,14 @@ entity spi_common is
         G_DATA_WIDTH: integer
     );
     port (
-        i_sclk: in std_logic;
-        i_cs_n: in std_logic;
+        i_clk: in std_logic;
+        i_rst_n: in std_logic;
+
+        i_shift_en: in std_logic;
+        i_sample_en: in std_logic;
+
         i_in: in std_logic;
+        i_cs_n: in std_logic;
         o_out: out std_logic;
 
         i_data: in std_logic_vector(G_DATA_WIDTH-1 downto 0);
@@ -27,52 +32,57 @@ end entity;
 
 architecture rtl of spi_common is
     signal r_sample_shf: std_logic_vector(G_DATA_WIDTH-1 downto 0);
+
+    signal r_rst_mux: boolean;
 begin
     o_data_shf <= r_sample_shf;
     o_data <= r_sample_shf when o_sample_done = '1';
 
+    r_rst_mux <= i_cs_n /= '0' or i_rst_n = '0';
+
     -- Shift data out on `o_out`
-    p_shift: process(i_sclk, i_cs_n)
+    p_shift: process(i_clk)
         variable v_buf: std_logic_vector(G_DATA_WIDTH-1 downto 0);
         variable v_count: integer range 0 to int_max(G_DATA_WIDTH);
     begin
-        if i_cs_n /= '0' then
-            v_count := 0;
-            o_shift_done <= '0';
-        elsif rising_edge(i_sclk) then
+        if rising_edge(i_clk) then
             o_shift_done <= '0';
 
-            if v_count = 0 then
-                v_buf := i_data;
-            end if;
-
-            o_out <= v_buf(v_buf'high - v_count);
-            v_count := v_count + 1;
-
-            if v_count >= G_DATA_WIDTH then
+            if r_rst_mux then
                 v_count := 0;
-                o_shift_done <= '1';
+            elsif i_shift_en = '1' then
+                if v_count = 0 then
+                    v_buf := i_data;
+                end if;
+
+                o_out <= v_buf(v_buf'high - v_count);
+                v_count := v_count + 1;
+
+                if v_count >= G_DATA_WIDTH then
+                    v_count := 0;
+                    o_shift_done <= '1';
+                end if;
             end if;
         end if;
     end process p_shift;
 
     -- Sample data and place it in the buffer. This notifies in `o_rdy`
-    p_sample: process(i_sclk, i_cs_n)
+    p_sample: process(i_clk)
         variable v_count: integer range 0 to int_max(G_DATA_WIDTH);
-
     begin
-        if i_cs_n /= '0' then
-            v_count := 0;
-            o_sample_done <= '0';
-        elsif falling_edge(i_sclk) then
+        if rising_edge(i_clk) then
             o_sample_done <= '0';
 
-            r_sample_shf(r_sample_shf'high - v_count) <= i_in;
-            v_count := v_count + 1;
-
-            if v_count >= G_DATA_WIDTH then
+            if r_rst_mux then
                 v_count := 0;
-                o_sample_done <= '1';
+            elsif i_sample_en = '1' then
+                r_sample_shf(r_sample_shf'high - v_count) <= i_in;
+                v_count := v_count + 1;
+
+                if v_count >= G_DATA_WIDTH then
+                    v_count := 0;
+                    o_sample_done <= '1';
+                end if;
             end if;
         end if;
     end process p_sample;

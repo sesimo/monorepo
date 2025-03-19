@@ -51,7 +51,7 @@ begin
             i_sample_en => r_sample_en,
             i_shift_en => r_shift_en,
 
-            i_in => i_mosi,
+            i_in => r_mosi_buf,
             i_cs_n => r_cs_n_buf,
             o_out => o_miso,
 

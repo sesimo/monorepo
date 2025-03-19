@@ -12,6 +12,7 @@ SOURCES=\
 	src/util/counter.vhd  \
 	src/util/enable.vhd   \
 	src/util/pulse.vhd   \
+	src/util/edge.vhd \
 	src/reset.vhd  \
 	src/adc.vhd  \
 	src/ccd.vhd  \

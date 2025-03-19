@@ -46,7 +46,6 @@ architecture structural of bofp1 is
     signal r_ccd_data_rdy: std_logic;
 
     signal r_adc_spi_sclk: std_logic;
-    signal r_adc_spi_en: std_logic; -- Start read
     signal r_adc_spi_data: std_logic_vector(G_ADC_WIDTH-1 downto 0);
     signal r_adc_spi_rdy: std_logic; -- Ready to read out
 
@@ -136,18 +135,6 @@ begin
 
         i_pin_eoc => i_adc_eoc,
         o_pin_stconv => o_adc_stconv,
-
-        o_rd_en => r_adc_spi_en
-    );
-
-    u_adc_spi: entity work.spi_main(rtl) generic map(
-        G_DATA_WIDTH => G_ADC_WIDTH
-    )
-    port map(
-        i_clk => r_clk_main,
-        i_rst_n => r_rst_n,
-        i_start => r_adc_spi_en,
-        i_data => "1101000000000000",
 
         i_miso => i_spi_main_miso,
         i_sclk => r_adc_spi_sclk,

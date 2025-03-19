@@ -16,7 +16,13 @@ entity ads8329 is
         i_pin_eoc: in std_logic;
         o_pin_stconv: inout std_logic;
 
-        o_rd_en: out std_logic
+        i_miso: in std_logic;
+        i_sclk: in std_logic;
+        o_mosi: out std_logic;
+        o_cs_n: out std_logic;
+
+        o_data: out std_logic_vector(15 downto 0);
+        o_rdy: out std_logic
     );
 end entity ads8329;
 
@@ -25,9 +31,12 @@ architecture rtl of ads8329 is
     signal r_state: t_state;
 
     signal r_stconv_rise: std_logic;
+    signal r_rd_en: std_logic;
 
     signal r_eoc: std_logic;
     signal r_cdc_eoc: std_logic;
+
+    constant c_cmd_read: std_logic_vector(15 downto 0) := x"D000";
 begin
     u_stconv_pulse: entity work.pulse(rtl)
         generic map(
@@ -39,6 +48,25 @@ begin
             i_cyc_cnt => std_logic_vector(to_unsigned(G_STCONV_HOLD_CYC, 8)),
             i_en => r_stconv_rise,
             o_out => o_pin_stconv
+        );
+
+    u_spi: entity work.spi_main(rtl)
+        generic map(
+            G_DATA_WIDTH => 16
+        )
+        port map(
+            i_clk => i_clk,
+            i_rst_n => i_rst_n,
+            i_start => r_rd_en,
+            i_data => c_cmd_read,
+
+            i_miso => i_miso,
+            i_sclk => i_sclk,
+            o_mosi => o_mosi,
+            o_cs_n => o_cs_n,
+
+            o_data => o_data,
+            o_rdy => o_rdy
         );
 
     p_eoc: process(i_clk)
@@ -69,9 +97,9 @@ begin
                 r_state <= S_IDLE;
                 
                 r_stconv_rise <= '0';
-                o_rd_en <= '0';
+                r_rd_en <= '0';
             else 
-                o_rd_en <= '0';
+                r_rd_en <= '0';
                 r_stconv_rise <= '0';
 
                 case r_state is
@@ -92,7 +120,7 @@ begin
                     when S_CONVERTING =>
                         -- Started, wait for conversion to complete
                         if r_eoc = '1' then
-                            o_rd_en <= '1';
+                            r_rd_en <= '1';
 
                             r_state <= S_IDLE;
                         end if;

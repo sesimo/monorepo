@@ -14,11 +14,11 @@ SOURCES=\
 	src/util/pulse.vhd   \
 	src/util/edge.vhd \
 	src/reset.vhd  \
-	src/adc.vhd  \
 	src/ccd.vhd  \
 	src/spi/spi_common.vhd \
 	src/spi/spi_main.vhd \
 	src/spi/spi_sub.vhd  \
+	src/adc.vhd  \
 	src/ctrl/ctrl_common_pkg.vhd \
 	src/ctrl/ctrl.vhd \
 	src/bofp1.vhd

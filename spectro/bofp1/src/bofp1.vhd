@@ -12,6 +12,7 @@ entity bofp1 is
     );
     port (
         i_clk: in std_logic;
+        i_rst_n: in std_logic;
 
         o_ccd_sh: out std_logic;
         o_ccd_mclk: out std_logic;
@@ -41,6 +42,7 @@ architecture structural of bofp1 is
     signal r_rst: std_logic;
     signal r_rst_n: std_logic;
     signal r_rst_en: std_logic;
+    signal r_rst_gen: std_logic;
 
     signal r_ccd_start: std_logic; -- Passed to control module
     signal r_ccd_data_rdy: std_logic;
@@ -90,6 +92,8 @@ begin
     r_rst_n <= not r_rst;
     o_spi_main_sclk <= r_adc_spi_sclk;
 
+    r_rst <= '1' when r_rst_gen = '1' or i_rst_n = '0' else '0';
+
     u_reset: entity work.reset(rtl)
         generic map(
             G_CYC_COUNT => 4
@@ -97,7 +101,7 @@ begin
         port map(
             i_clk => i_clk,
             i_en => r_rst_en,
-            o_rst => r_rst
+            o_rst => r_rst_gen
         );
 
     u_clk: clk_wizard

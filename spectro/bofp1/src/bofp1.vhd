@@ -65,8 +65,7 @@ architecture structural of bofp1 is
     component fifo_data is
         port (
             rst: in std_logic;
-            wr_clk: in std_logic;
-            rd_clk: in std_logic;
+            clk: in std_logic;
             din: in std_logic_vector(G_ADC_WIDTH-1 downto 0);
             wr_en: in std_logic;
             rd_en: in std_logic;
@@ -148,8 +147,7 @@ begin
 
     u_fifo_data: fifo_data port map (
         rst => r_rst,
-        wr_clk => r_clk_main,
-        rd_clk => i_spi_sub_sclk,
+        clk => r_clk_main,
         wr_en => r_adc_spi_rdy,
         din => r_adc_spi_data,
         rd_en => r_ctrl_fifo_rd_en,

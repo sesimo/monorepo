@@ -154,7 +154,7 @@ static int bofp1_set_integration_time(const struct device *dev,
         return 0;
 }
 
-static int bofp1_reset(const struct device *dev)
+int bofp1_reset(const struct device *dev)
 {
         return bofp1_write_reg(dev, BOFP1_REG_RESET, 0);
 }
@@ -207,12 +207,6 @@ int bofp1_enable_read(const struct device *dev)
         int status;
         const struct bofp1_cfg *cfg = dev->config;
 
-        status = gpio_pin_interrupt_configure_dt(&cfg->busy_gpios,
-                                                 GPIO_INT_EDGE_TO_INACTIVE);
-        if (status != 0) {
-                return status;
-        }
-
         status = gpio_pin_interrupt_configure_dt(&cfg->fifo_w_gpios,
                                                  GPIO_INT_EDGE_TO_ACTIVE);
 
@@ -223,12 +217,6 @@ int bofp1_disable_read(const struct device *dev)
 {
         int status;
         const struct bofp1_cfg *cfg = dev->config;
-
-        status = gpio_pin_interrupt_configure_dt(&cfg->busy_gpios,
-                                                 GPIO_INT_DISABLE);
-        if (status != 0) {
-                return status;
-        }
 
         status = gpio_pin_interrupt_configure_dt(&cfg->fifo_w_gpios,
                                                  GPIO_INT_DISABLE);
@@ -244,9 +232,14 @@ static void bofp1_busy_fall_cb(const struct device *gpio,
         ARG_UNUSED(gpio);
         ARG_UNUSED(pins);
 
-        LOG_DBG("sampling done");
-
         data = CONTAINER_OF(cb, struct bofp1_data, busy_fall_cb);
+
+        if (!atomic_test_and_clear_bit(&data->state, BOFP1_BUSY)) {
+                return;
+        }
+
+        LOG_ERR("sampling done");
+
         bofp1_rtio_read(data->dev);
 }
 
@@ -258,7 +251,7 @@ static void bofp1_fifo_wmark_cb(const struct device *gpio,
         ARG_UNUSED(gpio);
         ARG_UNUSED(pins);
 
-        LOG_DBG("fifo watermark hit");
+        LOG_ERR("fifo watermark hit");
 
         data = CONTAINER_OF(cb, struct bofp1_data, fifo_w_cb);
         bofp1_rtio_read(data->dev);
@@ -317,8 +310,16 @@ static int bofp1_init(const struct device *dev)
                 return status;
         }
 
+        /* Busy interrupt should always be enabled */
+        status = gpio_pin_interrupt_configure_dt(&cfg->busy_gpios,
+                                                 GPIO_INT_EDGE_TO_INACTIVE);
+        if (status != 0) {
+                return status;
+        }
+
         status = bofp1_reset(dev);
         if (status != 0) {
+                LOG_ERR("reset failed: %i", status);
                 return status;
         }
 

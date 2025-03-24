@@ -25,6 +25,12 @@ static void bofp1_submit_fetch(struct rtio_iodev_sqe *iodev_sqe)
         uint8_t reg[2];
         size_t real_len;
 
+        if (atomic_test_and_set_bit(&data->state, BOFP1_BUSY)) {
+                LOG_ERR("ccd busy");
+                rtio_iodev_sqe_err(iodev_sqe, -EBUSY);
+                return;
+        }
+
         status = bofp1_enable_read(dev);
         if (status != 0) {
                 rtio_iodev_sqe_err(iodev_sqe, status);
@@ -69,6 +75,8 @@ static void bofp1_finish(const struct device *dev, int status)
                 rtio_iodev_sqe_err(sqe, status);
         }
 
+        atomic_clear_bit(&data->state, BOFP1_BUSY);
+
         LOG_INF("done");
 }
 
@@ -112,6 +120,13 @@ static void bofp1_data_read(const struct device *dev)
         size = bofp1_frame_size() - index;
         if (size > READ_CHUNK_SIZE) {
                 size = READ_CHUNK_SIZE;
+
+                if (!atomic_test_bit(&data->state, BOFP1_BUSY)) {
+                        LOG_ERR("sensor completed while data is still in fifo");
+                        /* TODO: proper rtio reset */
+                        (void)bofp1_reset(dev);
+                        goto exit;
+                }
         }
 
         LOG_INF("index: %zu, size: %zu", index, size);

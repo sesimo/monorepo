@@ -37,6 +37,8 @@
 #define BOFP1_NUM_ELEMENTS_TOTAL                                               \
         (BOFP1_NUM_ELEMENTS_REAL + BOFP1_NUM_ELEMENTS_DUMMY)
 
+#define BOFP1_BUSY    (0) /* Sensor busy */
+
 struct bofp1_cfg {
         uint8_t psc;
         uint8_t clkdiv_dt;
@@ -68,6 +70,8 @@ struct bofp1_data {
         size_t wr_index;
 
         struct k_spinlock lock;
+
+        atomic_t state;
 };
 
 int bofp1_access(const struct device *dev, bool write, uint8_t addr, void *data,
@@ -80,6 +84,8 @@ int bofp1_stream(const struct device *dev, void *data, size_t size);
 int bofp1_read_reg(const struct device *dev, uint8_t addr, uint8_t *value);
 
 void bofp1_submit(const struct device *dev, struct rtio_iodev_sqe *sqe);
+
+int bofp1_reset(const struct device *dev);
 
 int bofp1_get_decoder(const struct device *dev,
                       const struct sensor_decoder_api **decoder);

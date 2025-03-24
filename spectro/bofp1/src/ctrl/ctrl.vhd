@@ -129,18 +129,11 @@ begin
                     -- Perform reading operation
                     -- TODO: Save whole buffer
                     v_reg_raw := r_in_buf(7 downto 4);
-
-                    if not is_write(v_reg_raw) then
-                        case parse_reg(v_reg_raw) is
-                            when REG_STREAM =>
-                                r_streaming <= true;
-
-                            when others => null;
-                        end case;
-                    end if;
-                elsif is_write(v_reg_raw) then
-                    -- Perform writing operation
+                else
                     case parse_reg(v_reg_raw) is
+                        when REG_STREAM =>
+                            r_streaming <= true;
+
                         when REG_SAMPLE =>
                             o_ccd_sample <= '1';
 

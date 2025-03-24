@@ -98,7 +98,7 @@ begin
             G_CYC_COUNT => 4
         )
         port map(
-            i_clk => i_clk,
+            i_clk => r_clk_main,
             i_en => r_rst_en,
             o_rst => r_rst_gen
         );

@@ -5,8 +5,8 @@ SRC := $(PWD)/src
 BUILD_DIR := $(PWD)/build
 
 UNAME := $(shell uname -r)
-KDIR ?= /lib/modules/$(UNAME)/build
-MAKE_CMD := $(MAKE) -C $(KDIR) M=$(BUILD_DIR)
+KERNEL_SRC ?= /lib/modules/$(UNAME)/build
+MAKE_CMD := $(MAKE) -C $(KERNEL_SRC) M=$(BUILD_DIR)
 
 TARGET := $(BUILD_DIR)/bomc1.ko
 

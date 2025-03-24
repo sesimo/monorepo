@@ -11,7 +11,6 @@ context uvvm_util.uvvm_util_context;
 entity clk_wizard is
         port (
             clk_in1: in std_logic;
-            reset: in std_logic;
             main: out std_logic;
             sclk_adc: out std_logic;
             locked: out std_logic

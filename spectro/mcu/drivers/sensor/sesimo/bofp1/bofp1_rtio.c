@@ -22,7 +22,7 @@ static void bofp1_submit_fetch(struct rtio_iodev_sqe *iodev_sqe)
         const struct device *dev = config->sensor;
         struct bofp1_data *data = dev->data;
         struct rtio_sqe *sqe;
-        uint8_t reg;
+        uint8_t reg[2];
         size_t real_len;
 
         status = bofp1_enable_read(dev);
@@ -44,8 +44,9 @@ static void bofp1_submit_fetch(struct rtio_iodev_sqe *iodev_sqe)
                 return;
         }
 
-        reg = BOFP1_WRITE_REG(BOFP1_REG_SAMPLE);
-        rtio_sqe_prep_tiny_write(sqe, data->iodev_bus, RTIO_PRIO_NORM, &reg,
+        reg[0] = BOFP1_WRITE_REG(BOFP1_REG_SAMPLE);
+        reg[1] = 0;
+        rtio_sqe_prep_tiny_write(sqe, data->iodev_bus, RTIO_PRIO_NORM, reg,
                                  sizeof(reg), NULL);
 
         data->iodev_sqe = iodev_sqe;
@@ -87,7 +88,7 @@ static void bofp1_data_read(const struct device *dev)
         struct bofp1_data *data = dev->data;
         size_t size;
         size_t index;
-        uint8_t reg;
+        uint8_t reg[2];
         struct rtio_sqe *wr_reg;
         struct rtio_sqe *rd_data;
         struct rtio_sqe *cb_finish;
@@ -118,8 +119,9 @@ static void bofp1_data_read(const struct device *dev)
                 goto exit;
         }
 
-        reg = BOFP1_READ_REG(BOFP1_REG_STREAM);
-        rtio_sqe_prep_tiny_write(wr_reg, data->iodev_bus, RTIO_PRIO_HIGH, &reg,
+        reg[0] = BOFP1_READ_REG(BOFP1_REG_STREAM);
+        reg[1] = 0;
+        rtio_sqe_prep_tiny_write(wr_reg, data->iodev_bus, RTIO_PRIO_HIGH, reg,
                                  sizeof(reg), NULL);
         rtio_sqe_prep_read(rd_data, data->iodev_bus, RTIO_PRIO_HIGH,
                            data->wr_buf + index, size, NULL);

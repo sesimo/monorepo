@@ -60,8 +60,6 @@ static void bofp1_finish(const struct device *dev, int status)
         struct bofp1_data *data = dev->data;
         struct rtio_iodev_sqe *sqe = data->iodev_sqe;
 
-        bofp1_disable_read(dev);
-
         data->iodev_sqe = NULL;
         data->wr_buf = NULL;
 
@@ -83,6 +81,15 @@ static void bofp1_rtio_finish(struct rtio *r, const struct rtio_sqe *sqe,
         bofp1_finish(dev_arg, 0);
 }
 
+static void bofp1_rtio_continue(struct rtio *r, const struct rtio_sqe *sqe,
+                                void *dev_arg)
+{
+        ARG_UNUSED(r);
+        ARG_UNUSED(sqe);
+
+        bofp1_enable_read(dev_arg);
+}
+
 static void bofp1_data_read(const struct device *dev)
 {
         struct bofp1_data *data = dev->data;
@@ -91,12 +98,10 @@ static void bofp1_data_read(const struct device *dev)
         uint8_t reg[2];
         struct rtio_sqe *wr_reg;
         struct rtio_sqe *rd_data;
-        struct rtio_sqe *cb_finish;
+        struct rtio_sqe *cb_action;
         k_spinlock_key_t key;
 
         key = k_spin_lock(&data->lock);
-
-        bofp1_disable_read(dev);
 
         index = data->wr_index;
         if (index >= bofp1_frame_size()) {
@@ -113,8 +118,9 @@ static void bofp1_data_read(const struct device *dev)
 
         wr_reg = rtio_sqe_acquire(data->rtio_ctx);
         rd_data = rtio_sqe_acquire(data->rtio_ctx);
+        cb_action = rtio_sqe_acquire(data->rtio_ctx);
 
-        if (wr_reg == NULL || rd_data == NULL) {
+        if (wr_reg == NULL || rd_data == NULL || cb_action == NULL) {
                 bofp1_finish(dev, -ENOMEM);
                 goto exit;
         }
@@ -127,24 +133,20 @@ static void bofp1_data_read(const struct device *dev)
                            data->wr_buf + index, size, NULL);
 
         wr_reg->flags = RTIO_SQE_TRANSACTION;
+        rd_data->flags = RTIO_SQE_CHAINED;
 
         data->wr_index += size;
         if (data->wr_index >= bofp1_frame_size()) {
                 /* Finish up */
-                cb_finish = rtio_sqe_acquire(data->rtio_ctx);
-                if (cb_finish == NULL) {
-                        bofp1_finish(dev, -ENOMEM);
-                        goto exit;
-                }
-
-                rd_data->flags = RTIO_SQE_CHAINED;
-
-                rtio_sqe_prep_callback(cb_finish, bofp1_rtio_finish,
+                rtio_sqe_prep_callback(cb_action, bofp1_rtio_finish,
+                                       (void *)dev, NULL);
+        } else {
+                /* Re-enable read */
+                rtio_sqe_prep_callback(cb_action, bofp1_rtio_continue,
                                        (void *)dev, NULL);
         }
 
         rtio_submit(data->rtio_ctx, 0);
-        bofp1_enable_read(dev);
 
 exit:
         k_spin_unlock(&data->lock, key);
@@ -171,8 +173,12 @@ void bofp1_submit(const struct device *dev, struct rtio_iodev_sqe *iodev_sqe)
 
 void bofp1_rtio_read(const struct device *dev)
 {
+        int status;
         struct bofp1_data *data = dev->data;
         struct rtio_work_req *req = rtio_work_req_alloc();
+
+        status = bofp1_disable_read(dev);
+        __ASSERT_NO_MSG(status == 0);
 
         rtio_work_req_submit(req, data->iodev_sqe, bofp1_data_read_work);
 }

@@ -339,7 +339,7 @@ static int bofp1_init(const struct device *dev)
 }
 
 #define BOFP1_SPI_OP    (SPI_MODE_CPHA | SPI_WORD_SET(8) | SPI_TRANSFER_MSB)
-#define BOFP1_SPI_DELAY (0)
+#define BOFP1_SPI_DELAY (1)
 
 #define BOFP1_INIT(inst_)                                                      \
         SPI_DT_IODEV_DEFINE(bofp1_iodev_##inst_##__, DT_DRV_INST(inst_),       \

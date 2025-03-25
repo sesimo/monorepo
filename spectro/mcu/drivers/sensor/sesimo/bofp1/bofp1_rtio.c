@@ -125,6 +125,7 @@ static void bofp1_data_read(const struct device *dev)
                         LOG_ERR("sensor completed while data is still in fifo");
                         /* TODO: proper rtio reset */
                         (void)bofp1_reset(dev);
+                        bofp1_finish(dev, -EBUSY);
                         goto exit;
                 }
         }

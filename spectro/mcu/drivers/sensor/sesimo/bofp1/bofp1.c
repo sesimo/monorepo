@@ -251,9 +251,15 @@ static void bofp1_fifo_wmark_cb(const struct device *gpio,
         ARG_UNUSED(gpio);
         ARG_UNUSED(pins);
 
+        data = CONTAINER_OF(cb, struct bofp1_data, fifo_w_cb);
+
         LOG_ERR("fifo watermark hit");
 
-        data = CONTAINER_OF(cb, struct bofp1_data, fifo_w_cb);
+        if (!atomic_test_bit(&data->state, BOFP1_BUSY)) {
+                LOG_ERR("fifo wmark when not busy");
+                return;
+        }
+
         bofp1_rtio_read(data->dev);
 }
 

@@ -15,9 +15,11 @@ prepare_builddir = \
 	--exclude="$(BUILD_DIR)/" \
 	$(PWD)/ $(BUILD_DIR)
 
-all modules:
+all: modules
+
+modules modules_install:
 	@$(prepare_builddir)
-	@$(MAKE_CMD) modules
+	@$(MAKE_CMD) $@
 
 .PHONY: insmod
 insmod: modules rmmod

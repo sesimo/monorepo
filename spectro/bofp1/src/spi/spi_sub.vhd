@@ -60,7 +60,7 @@ begin
             o_out => o_miso,
 
             i_data => i_data,
-            o_data_shf => o_data_shf,
+            o_data => o_data_shf,
 
             o_sample_done => o_sample_done,
             o_shift_done => o_shift_done

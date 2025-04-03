@@ -31,7 +31,7 @@ entity tcd1304 is
 end entity tcd1304;
 
 architecture rtl of tcd1304 is
-    type t_state is (S_IDLE, S_SYNCING, S_STARTING, S_CAPTURE);
+    type t_state is (S_IDLE, S_SYNCING, S_ICG, S_CAPTURE);
     signal r_state: t_state;
 
     constant c_sh_pulse: integer := G_SH_CYC_NS / (1_000_000_000 / G_CLK_FREQ);
@@ -62,12 +62,9 @@ architecture rtl of tcd1304 is
     signal r_data_enable: std_logic;
     signal r_data_rst_n: std_logic;
 
-    signal r_rd_count: integer range 0 to G_NUM_ELEMENTS;
+    signal r_cnt_rolled: std_logic;
+    signal r_icg_rolled: std_logic;
 begin
-    o_pin_icg <= r_icg_buf;
-    o_pin_mclk <= r_mclk_buf;
-    o_pin_sh <= r_sh_delayed;
-    o_data_rdy <= r_data_enable;
 
     r_psc_div <= std_logic_vector(resize(
                  unsigned(i_psc_div) + 1, r_psc_div'length));
@@ -193,55 +190,86 @@ begin
         o_enable => r_data_enable
     );
 
-    -- Reset when not capturing
+    -- Hold data enable in reset when not in capture state
     r_data_rst_n <= '0' when (i_rst_n = '0' or r_state /= S_CAPTURE) else '1';
 
+    -- Read out pixel from the ADC
+    p_pix_read: process(i_clk)
+    begin
+        if rising_edge(i_clk) then
+            o_data_rdy <= '0';
+
+            if r_state = S_CAPTURE then
+                o_data_rdy <= r_data_enable;
+            end if;
+        end if;
+    end process p_pix_read;
+
+    -- Count number of pixels read out from the ADC
+    u_pix_cnt: entity work.counter
+        generic map(
+            G_WIDTH => 12
+        )
+        port map(
+            i_clk => i_clk,
+            i_rst_n => i_rst_n,
+            i_en => r_data_enable,
+            i_max => std_logic_vector(to_unsigned(G_NUM_ELEMENTS, 12)),
+            o_roll => r_cnt_rolled
+        );
+
+    -- Counter to ensure that ICG is held long enough
+    u_icg_cnt: entity work.counter
+        generic map(
+            G_WIDTH => 9
+        )
+        port map(
+            i_clk => i_clk,
+            i_rst_n => i_rst_n,
+            i_en => r_icg_buf,
+            i_max => std_logic_vector(to_unsigned(c_icg_cyc, 9)),
+            o_roll => r_icg_rolled
+        );
+
     p_state: process(i_clk)
-        variable v_count: integer range 0 to c_icg_cyc;
     begin
         if rising_edge(i_clk) then
             if i_rst_n = '0' then
-                r_icg_buf <= '0';
                 r_state <= S_IDLE;
-                r_rd_count <= 0;
             else
                 case r_state is
                     when S_IDLE =>
-                        r_icg_buf <= '0';
-                        o_ccd_busy <= '0';
-
                         if i_start = '1' then
                             r_state <= S_SYNCING;
-                            o_ccd_busy <= '1';
                         end if;
 
                     when S_SYNCING =>
                         -- Sync to the next rising edge of the shift
                         -- signal (before delay)
                         if r_sh_en = '1' then
-                            r_icg_buf <= '1';
-                            r_state <= S_STARTING;
-                            v_count := 0;
+                            r_state <= S_ICG;
                         end if;
 
-                    when S_STARTING =>
-                        if v_count >= c_icg_cyc then
-                            r_icg_buf <= '0';
+                    when S_ICG =>
+                        -- Wait for the ICG counter to roll over
+                        if r_icg_rolled = '1' then
                             r_state <= S_CAPTURE;
-                        else
-                            v_count := v_count + 1;
                         end if;
 
                     when S_CAPTURE =>
-                        if r_rd_count >= G_NUM_ELEMENTS then
-                            r_rd_count <= 0;
+                        -- Wait for pixel counter to roll over
+                        if r_cnt_rolled = '1' then
                             r_state <= S_IDLE;
-                        elsif r_data_enable then
-                            r_rd_count <= r_rd_count + 1;
                         end if;
                 end case;
             end if;
         end if;
     end process p_state;
+
+    r_icg_buf <= '1' when r_state = S_ICG else '0';
+    o_ccd_busy <= '0' when r_state = S_IDLE else '1';
+    o_pin_icg <= r_icg_buf;
+    o_pin_mclk <= r_mclk_buf;
+    o_pin_sh <= r_sh_delayed;
 
 end architecture rtl;

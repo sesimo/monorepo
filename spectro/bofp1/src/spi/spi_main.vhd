@@ -14,7 +14,7 @@ entity spi_main is
         i_data: in std_logic_vector(G_DATA_WIDTH-1 downto 0);
 
         i_miso: in std_logic;
-        i_sclk: in std_logic;
+        i_sclk2: in std_logic;
         o_mosi: out std_logic;
         o_cs_n: out std_logic;
         
@@ -54,53 +54,94 @@ begin
             o_out => o_mosi,
 
             i_data => i_data,
-            o_data_shf => o_data,
+            o_data => o_data,
 
             o_sample_done => r_sample_done,
             o_shift_done => r_shift_done
         );
 
-    -- Detect rising edge, which will be used for shifting
-    -- We assume that the generated SCLK is running on the same base as
-    -- i_clk, and we therefore dont do any clock domain crossing
-    u_edge_shift: entity work.edge_detect(rtl)
-        generic map(
-            C_FROM => '0',
-            C_TO => '1'
-        )
-        port map(
-            i_clk => i_clk,
-            i_rst_n => i_rst_n,
-            i_sig => i_sclk,
-            o_edge => r_shift_en
-        );
+    -- Detect edge on SCLK signal. Because of difficulties detecting
+    -- both rising and falling edge, this does not use the SCLK signal
+    -- itself but instead a separate clock at twice the frequency of the
+    -- SCLK signal. Every other rising edge then corresponds to rising
+    -- or falling edge of the SCLK signal. Doing it this way should
+    -- avoid having to route the SCLK signal outside the clock network.
+    b_sclk_edge: block
+        signal r_last: boolean := false;
+        signal r_sclk: boolean := false;
+        signal r_edge: boolean := false;
+        signal r_mode: boolean := false;
+    begin
 
-    -- Detect falling edge, which will be used for sampling
-    -- We assume that the generated SCLK is running on the same base as
-    -- i_clk, and we therefore dont do any clock domain crossing
-    u_edge_sample: entity work.edge_detect(rtl)
-        generic map(
-            C_FROM => '1',
-            C_TO => '0'
-        )
-        port map(
-            i_clk => i_clk,
-            i_rst_n => i_rst_n,
-            i_sig => i_sclk,
-            o_edge => r_sample_en
-        );
+        -- Flip the edge on every rising edge of SCLK2. Because SCLK2 is
+        -- 2x faster than SCLK, the first rising edge will correspond to
+        -- rising SCLK, and the second rising edge will correspond to falling
+        -- SCLK. This repeats infinitely
+        p_sclk: process(i_sclk2)
+        begin
+            if rising_edge(i_sclk2) then
+                r_sclk <= not r_sclk;
+            end if;
+        end process p_sclk;
 
-    p_handle_state: process(i_clk)
-        variable v_sclk_last: std_logic;
+        -- Syncrhonize edge from SCLK2 to CLK domain. Because the two domains
+        -- are synchronous no CDC is required, and the edge can then
+        -- be determined by a difference between the CLK syncrhonized register
+        -- and the register clocked by SCLK2.
+        p_edge_sync: process(i_clk)
+        begin
+            if rising_edge(i_clk) then
+                r_last <= r_sclk;
+            end if;
+        end process p_edge_sync;
+
+        -- Edge has been updated, but CLK has not yet processed it.
+        r_edge <= r_sclk /= r_last;
+
+        -- Invert the mode on every SCLK edge detected. This tells what
+        -- edge it is (falling or rising SCLK) to determine whether this
+        -- is the sampling or shifting edge.
+        p_mode: process(i_clk)
+        begin
+            if rising_edge(i_clk) then
+                if r_edge then
+                    r_mode <= not r_mode;
+                end if;
+            end if;
+        end process p_mode;
+
+        r_sample_en <= '1' when (r_mode and r_edge) else '0';
+        r_shift_en <= '1' when (not r_mode and r_edge) else '0';
+
+    end block b_sclk_edge;
+
+    p_cs_n: process(r_state)
+    begin
+        case r_state is
+            when S_RUNNING =>
+                r_cs_n_buf <= '0';
+            when others =>
+                r_cs_n_buf <= '1';
+        end case;
+    end process p_cs_n;
+
+    p_rdy: process(i_clk)
+    begin
+        if rising_edge(i_clk) then
+            o_rdy <= '0';
+
+            if i_rst_n /= '0' and r_state = S_STOPPING then
+                o_rdy <= '1';
+            end if;
+        end if;
+    end process p_rdy;
+
+    p_state: process(i_clk)
     begin
         if rising_edge(i_clk) then
             if i_rst_n = '0' then
-                r_cs_n_buf <= '1';
-                o_rdy <= '0';
                 r_state <= S_IDLE;
             else
-                o_rdy <= '0';
-
                 case r_state is
                     when S_IDLE =>
                         if i_start = '1' then
@@ -109,7 +150,6 @@ begin
                     when S_STARTING =>
                         -- Pull CS low on the first falling edge detected
                         if r_sample_en = '1' then
-                            r_cs_n_buf <= '0';
                             r_state <= S_RUNNING;
                         end if;
                     when S_RUNNING =>
@@ -117,16 +157,12 @@ begin
                         -- edge. CS can then be raised again after that.
                         if r_sample_done = '1' then
                             r_state <= S_STOPPING;
-                            r_cs_n_buf <= '1';
                         end if;
                     when S_STOPPING =>
-                        o_rdy <= '1';
                         r_state <= S_IDLE;
                 end case;
-
-                v_sclk_last := i_sclk;
             end if;
         end if;
-    end process p_handle_state;
+    end process p_state;
 
 end architecture rtl;

@@ -5,7 +5,7 @@ use ieee.numeric_std.all;
 
 entity ads8329 is
     generic (
-        G_STCONV_HOLD_CYC: integer := 10
+        G_STCONV_HOLD_CYC: integer := 20
     );
 
     port (
@@ -39,7 +39,6 @@ architecture rtl of ads8329 is
     signal r_rd_en: std_logic;
 
     signal r_eoc: std_logic;
-    signal r_cdc_eoc: std_logic;
 
     signal r_data_rdy: std_logic;
     
@@ -54,22 +53,6 @@ architecture rtl of ads8329 is
     constant c_cmd_read: std_logic_vector(15 downto 0) := x"D000";
     constant c_cmd_write_cfr: std_logic_vector(3 downto 0) := x"E";
 begin
-    o_rdy <= r_data_rdy;
-    r_cmd <= r_cfg_cmd when r_op_state = S_INIT else c_cmd_read;
-    r_transfer_start <= r_cmd_wr when r_op_state = S_INIT else r_rd_en;
-    o_pin_stconv <= '1' when r_op_state = S_INIT else r_stconv;
-
-    u_stconv_pulse: entity work.pulse(rtl)
-        generic map(
-            G_WIDTH => 8
-        )
-        port map(
-            i_clk => i_clk,
-            i_rst_n => i_rst_n,
-            i_cyc_cnt => std_logic_vector(to_unsigned(G_STCONV_HOLD_CYC, 8)),
-            i_en => r_stconv_rise,
-            o_out => r_stconv
-        );
 
     u_spi: entity work.spi_main(rtl)
         generic map(
@@ -90,28 +73,34 @@ begin
             o_rdy => r_data_rdy
         );
 
-    p_eoc: process(i_clk)
-        variable v_last: std_logic;
+    b_eoc: block
+        signal r_cdc1: std_logic;
+        signal r_cdc2: std_logic;
+        signal r_eoc_long: std_logic;
+
+        attribute ASYNC_REG: boolean;
+        attribute ASYNC_REG of r_cdc1: signal is true;
     begin
-        if rising_edge(i_clk) then
-            if i_rst_n = '0' then
-                r_eoc <= '0';
-                r_cdc_eoc <= '0';
-                v_last := '0';
-            else
-                if r_eoc = '0' and v_last = '0' then
-                    r_eoc <= r_cdc_eoc;
-                else
-                    r_eoc <= '0';
-                end if;
-
-                v_last := r_cdc_eoc;
-                r_cdc_eoc <= i_pin_eoc;
+        p_cdc: process(i_clk)
+        begin
+            if rising_edge(i_clk) then
+                r_cdc1 <= i_pin_eoc;
+                r_cdc2 <= r_cdc1;
             end if;
-        end if;
-    end process p_eoc;
+        end process p_cdc;
 
-    p_state: process(i_clk)
+        p_eoc_long: process(i_clk)
+        begin
+            if rising_edge(i_clk) then
+                r_eoc_long <= r_cdc2;
+            end if;
+        end process p_eoc_long;
+
+        -- Ensure eoc is only high for one clock cycle
+        r_eoc <= r_cdc2 and not r_eoc_long;
+    end block b_eoc;
+
+    p_op_state: process(i_clk)
     begin
         if rising_edge(i_clk) then
             if i_rst_n = '0' then
@@ -120,51 +109,87 @@ begin
                 r_op_state <= S_NORMAL;
             end if;
         end if;
-    end process p_state;
+    end process p_op_state;
 
-    p_config: process(i_clk)
-        variable v_busy: boolean;
+    b_config: block
+        signal r_in_config: boolean;
+
+        constant c_bit_reset: integer := 0;
     begin
-        if rising_edge(i_clk) then
-            r_cmd_wr <= '0';
+        -- According to the TI forum
+        -- (https://e2e.ti.com/support/data-converters-group/data-converters/  \
+        --  f/data-converters-forum/474186/ads8329-eoc-not-toggle)
+        -- the ADC needs to be reset with STCONV='1' to function properly.
+        p_config: process(i_clk)
+        begin
+            if rising_edge(i_clk) then
+                r_cmd_wr <= '0';
 
-            if i_rst_n = '0' then
-                v_busy := false;
-                r_config_done <= false;
-            elsif r_op_state = S_INIT then
-                if not v_busy then
+                if i_rst_n = '0' then
+                    r_in_config <= false;
+                elsif r_op_state = S_INIT and not r_in_config then
                     r_cfg_cmd(15 downto 12) <= c_cmd_write_cfr;
-                    r_cfg_cmd(11 downto 0) <= (0 => '0', others => '1');
+                    r_cfg_cmd(11 downto 0) <= (
+                        c_bit_reset => '0',
+                        others => '1'
+                    );
 
                     r_cmd_wr <= '1';
-                    v_busy := true;
-                elsif r_data_rdy = '1' then
-                    r_config_done <= true;
+                    r_in_config <= true;
                 end if;
             end if;
+        end process p_config;
+
+        p_done: process(i_clk)
+        begin
+            if rising_edge(i_clk) then
+                if i_rst_n = '0' then
+                    r_config_done <= false;
+                else
+                    r_config_done <= r_data_rdy = '1';
+                end if;
+            end if;
+        end process p_done;
+
+    end block b_config;
+
+    -- Ensure STCONV is held high long enough
+    u_stconv_pulse: entity work.pulse(rtl)
+        generic map(
+            G_WIDTH => 8
+        )
+        port map(
+            i_clk => i_clk,
+            i_rst_n => i_rst_n,
+            i_cyc_cnt => std_logic_vector(to_unsigned(G_STCONV_HOLD_CYC, 8)),
+            i_en => r_stconv_rise,
+            o_out => r_stconv
+        );
+
+    p_rd_en: process(i_clk)
+    begin
+        if rising_edge(i_clk) then
+            r_rd_en <= '0';
+
+            if r_conv_state = S_CONVERTING then
+                r_rd_en <= r_eoc;
+            end if;
         end if;
-    end process p_config;
+    end process p_rd_en;
 
     p_conv: process(i_clk)
     begin
         if rising_edge(i_clk) then
             if i_rst_n = '0' then
                 r_conv_state <= S_IDLE;
-                
-                r_stconv_rise <= '0';
-                r_rd_en <= '0';
             elsif r_op_state = S_NORMAL then
-                r_rd_en <= '0';
-                r_stconv_rise <= '0';
-
                 case r_conv_state is
                     when S_IDLE =>
                         -- Wait for start signal
                         if i_start = '1' then
-                            r_stconv_rise <= '1';
-
                             r_conv_state <= S_START;
                         end if;
+
                     when S_START =>
                         -- Wait for EOC to go low, which indicates the ADC
                         -- is converting.
@@ -175,13 +200,18 @@ begin
                     when S_CONVERTING =>
                         -- Started, wait for conversion to complete
                         if r_eoc = '1' then
-                            r_rd_en <= '1';
-
                             r_conv_state <= S_IDLE;
                         end if;
                 end case;
             end if;
         end if;
     end process p_conv;
+
+    r_stconv_rise <= '1' when (r_conv_state = S_IDLE and i_start = '1') else '0';
+    r_transfer_start <= r_cmd_wr when r_op_state = S_INIT else r_rd_en;
+    r_cmd <= r_cfg_cmd when r_op_state = S_INIT else c_cmd_read;
+
+    o_rdy <= r_data_rdy when r_op_state /= S_INIT else '0';
+    o_pin_stconv <= '1' when r_op_state = S_INIT else r_stconv;
 
 end architecture rtl;

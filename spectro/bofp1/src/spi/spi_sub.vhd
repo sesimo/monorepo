@@ -37,6 +37,11 @@ architecture rtl of spi_sub is
     signal r_mosi_unsafe: std_logic;
     signal r_cs_n_buf: std_logic;
     signal r_cs_n_unsafe: std_logic;
+
+    attribute ASYNC_REG: boolean;
+    attribute ASYNC_REG of r_sclk_unsafe : signal is true;
+    attribute ASYNC_REG of r_mosi_unsafe : signal is true;
+    attribute ASYNC_REG of r_cs_n_unsafe : signal is true;
 begin
     -- Instantiate common enttiy
     u_spi_common: entity work.spi_common

@@ -47,7 +47,7 @@ architecture structural of bofp1 is
     signal r_ccd_start: std_logic; -- Passed to control module
     signal r_ccd_data_rdy: std_logic;
 
-    signal r_adc_spi_sclk: std_logic;
+    signal r_adc_spi_sclk2: std_logic;
     signal r_adc_spi_data: std_logic_vector(G_ADC_WIDTH-1 downto 0);
     signal r_adc_spi_rdy: std_logic; -- Ready to read out
 
@@ -84,12 +84,12 @@ architecture structural of bofp1 is
             clk_in1: in std_logic;
             main: out std_logic;
             sclk_adc: out std_logic;
+            sclk2_adc: out std_logic;
             locked: out std_logic
         );
     end component clk_wizard;
 begin
     r_rst_n <= not r_rst;
-    o_spi_main_sclk <= r_adc_spi_sclk;
 
     r_rst <= '1' when r_rst_gen = '1' or i_rst_n = '0' else '0';
 
@@ -107,7 +107,8 @@ begin
         port map(
             clk_in1 => i_clk,
             main => r_clk_main,
-            sclk_adc => r_adc_spi_sclk
+            sclk_adc => o_spi_main_sclk,
+            sclk2_adc => r_adc_spi_sclk2
         );
 
     u_ccd: entity work.tcd1304(rtl) generic map(
@@ -137,7 +138,7 @@ begin
         o_pin_stconv => o_adc_stconv,
 
         i_miso => i_spi_main_miso,
-        i_sclk => r_adc_spi_sclk,
+        i_sclk2 => r_adc_spi_sclk2,
         o_mosi => o_spi_main_mosi,
         o_cs_n => o_spi_main_cs_n,
 

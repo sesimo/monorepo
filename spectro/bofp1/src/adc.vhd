@@ -17,7 +17,7 @@ entity ads8329 is
         o_pin_stconv: inout std_logic;
 
         i_miso: in std_logic;
-        i_sclk: in std_logic;
+        i_sclk2: in std_logic;
         o_mosi: out std_logic;
         o_cs_n: out std_logic;
 
@@ -82,7 +82,7 @@ begin
             i_data => r_cmd,
 
             i_miso => i_miso,
-            i_sclk => i_sclk,
+            i_sclk2 => i_sclk2,
             o_mosi => o_mosi,
             o_cs_n => o_cs_n,
 

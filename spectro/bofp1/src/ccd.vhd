@@ -106,8 +106,8 @@ begin
             i_clk => i_clk,
             i_rst_n => i_rst_n,
             i_en => '1',
-            i_cyc_cnt => r_mclk_cnt,
-            o_int => r_mclk_en
+            i_max => r_mclk_cnt,
+            o_roll => r_mclk_en
         );
     
     -- Generate pulse for output master clock
@@ -132,8 +132,8 @@ begin
             i_clk => i_clk,
             i_rst_n => i_rst_n,
             i_en => r_mclk_en,
-            i_cyc_cnt => r_psc_div,
-            o_int => r_psc_en
+            i_max => r_psc_div,
+            o_roll => r_psc_en
         );
 
     -- Counter for SH signal
@@ -145,8 +145,8 @@ begin
             i_clk => i_clk,
             i_rst_n => i_rst_n,
             i_en => r_psc_en,
-            i_cyc_cnt => r_sh_div,
-            o_int => r_sh_en
+            i_max => r_sh_div,
+            o_roll => r_sh_en
         );
 
     -- Generate shift signal

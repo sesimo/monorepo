@@ -26,6 +26,9 @@ entity ctrl is
 end entity ctrl;
 
 architecture behaviour of ctrl is
+    signal r_rst_n_mux: std_logic := '0';
+    signal r_spi_active: std_logic;
+
     signal r_out: std_logic_vector(15 downto 0);
     signal r_out_shf: std_logic_vector(7 downto 0);
     signal r_in_buf: std_logic_vector(7 downto 0);
@@ -36,29 +39,28 @@ architecture behaviour of ctrl is
     signal r_shift_done: std_logic;
     signal r_sample_done: std_logic;
 
-    signal r_shift_count: integer := 0;
+    signal r_shift_count: std_logic_vector(1 downto 0);
+    signal r_sample_count: std_logic_vector(1 downto 0);
+
+    -- Counter roll-over
+    signal r_shift_rolled: std_logic;
+    signal r_sample_rolled: std_logic;
+
+    signal r_reg_raw: std_logic_vector(7 downto 0);
+    signal r_reg_rdy: std_logic;
 
     -- Current range of the SPI output shift register
-    function cur_shf_range(data: std_logic_vector; count: integer)
+    function cur_shf_range(data: std_logic_vector; count: unsigned)
     return std_logic_vector is
-        variable v_head: integer;
+        variable head: integer;
     begin
-        v_head := data'high - count * 8;
+        head := data'high - to_integer(count) * 8;
 
-        return data(v_head downto v_head - 7);
+        return data(head downto head - 7);
     end function cur_shf_range;
-
-    function count_inc(cur: integer) return integer is
-    begin
-        return (cur + 1) mod 2;
-    end function count_inc;
 begin
-
-    -- TODO: ctrl data
+    r_rst_n_mux <= '0' when (i_rst_n = '0' or r_spi_active = '0') else '1';
     r_out <= i_fifo_data;
-
-    -- Current part of the data that is to be shifted out
-    r_out_shf <= cur_shf_range(r_out, r_shift_count);
 
     u_spi: entity work.spi_sub(rtl)
         generic map(
@@ -74,85 +76,135 @@ begin
             o_miso => o_miso,
             o_data_shf => r_in_buf,
             o_shift_done => r_shift_done,
-            o_sample_done => r_sample_done
+            o_sample_done => r_sample_done,
+            o_active => r_spi_active
         );
 
-    p_count: process(i_clk)
+    u_sample_count: entity work.counter
+        generic map(
+            G_WIDTH => 2
+        )
+        port map(
+            i_clk => i_clk,
+            i_rst_n => r_rst_n_mux,
+            i_en => r_sample_done,
+            i_max => std_logic_vector(to_unsigned(2, 2)),
+            o_cnt => r_sample_count,
+            o_roll => r_sample_rolled
+        );
+
+    u_shift_count: entity work.counter
+        generic map(
+            G_WIDTH => 2
+        )
+        port map(
+            i_clk => i_clk,
+            i_rst_n => r_rst_n_mux,
+            i_en => r_shift_done,
+            i_max => std_logic_vector(to_unsigned(2, 2)),
+            o_cnt => r_shift_count,
+            o_roll => r_shift_rolled
+        );
+
+    -- Load current part of the data that is to be shifted out
+    p_out_shf: process(i_clk)
     begin
         if rising_edge(i_clk) then
-            if i_rst_n = '0' or i_cs_n /= '0' then
-                r_shift_count <= 0;
-            elsif r_shift_done = '1' then
-                r_shift_count <= count_inc(r_shift_count);
+            if r_rst_n_mux /= '0' then
+                r_out_shf <= cur_shf_range(r_out, unsigned(r_shift_count));
             end if;
         end if;
-    end process p_count;
+    end process p_out_shf;
 
     -- Read from the FIFO whenever the last value has been shifted out in
     -- streaming mode. This depends on first-word write-through support in the
     -- FIFO.
-    p_stream: process(i_clk)
+    p_stream_load: process(i_clk)
     begin
         if rising_edge(i_clk) then
             o_fifo_rd <= '0';
 
-            if r_streaming and r_shift_done = '1' and r_shift_count = 1 then
-                if i_fifo_empty /= '1' then
-                    o_fifo_rd <= '1';
+            if r_streaming and r_shift_rolled = '1' and i_fifo_empty /= '1' then
+                o_fifo_rd <= '1';
+            end if;
+        end if;
+    end process p_stream_load;
+
+    -- Load the first 8 bits into a register to contain the register address
+    -- and write bit.
+    p_reg: process(i_clk)
+    begin
+        if rising_edge(i_clk) then
+            r_reg_rdy <= '0';
+
+            if r_sample_done = '1' and unsigned(r_sample_count) = 0 then
+                r_reg_rdy <= '1';
+                r_reg_raw <= r_in_buf;
+            end if;
+        end if;
+    end process p_reg;
+
+    -- Enter streaming mode. This is only done after shifting has completed,
+    -- to ensure that we don't read from fifo before the second word. The
+    -- first word is the previously read value, or the value from 
+    -- first word write through.
+    p_stream: process(i_clk)
+        variable is_read: boolean;
+    begin
+        if rising_edge(i_clk) then
+            is_read := not is_write(r_reg_raw(7 downto 4));
+
+            if r_rst_n_mux = '0' then
+                r_streaming <= false;
+            elsif r_shift_rolled = '1' and is_read then
+                if parse_reg(r_reg_raw(7 downto 4)) = REG_STREAM then
+                    r_streaming <= true;
                 end if;
             end if;
         end if;
     end process p_stream;
 
-    p_handle_in: process(i_clk)
-        variable v_count: integer range 0 to 1;
-        variable v_reg_raw: std_logic_vector(3 downto 0);
+    -- Read registere value
+    p_read: process(i_clk)
+        variable is_read: boolean;
     begin
         if rising_edge(i_clk) then
-            o_rst <= '0';
-            o_ccd_sample <= '0';
+            is_read := not is_write(r_reg_raw(7 downto 4));
 
-            if i_rst_n = '0' or i_cs_n /= '0' then
-                v_count := 0;
-                r_streaming <= false;
-
-                -- Only reload defaults on reset
-                if i_rst_n = '0' then
-                    o_regmap <= c_regmap_default;
-                end if;
-            elsif r_sample_done = '1' then
-                -- After receiving the first 8 bits. If this is a read
-                -- operation, prepare data to be shifted out. If this is
-                -- a write operation, wait until after the next 8 bits have
-                -- been received.
-                if v_count = 0 then
-                    -- Perform reading operation
-                    -- TODO: Save whole buffer
-                    v_reg_raw := r_in_buf(7 downto 4);
-                else
-                    case parse_reg(v_reg_raw) is
-                        when REG_STREAM =>
-                            r_streaming <= true;
-
-                        when REG_SAMPLE =>
-                            o_ccd_sample <= '1';
-
-                        when REG_RESET =>
-                            o_rst <= '1';
-
-                        when REG_CLKDIV =>
-                            o_regmap.clkdiv <= r_in_buf;
-
-                        when REG_SHDIV =>
-                            o_regmap.shdiv <= r_in_buf;
-
-                        when others => null;
-                    end case;
-                end if;
-
-                v_count := count_inc(v_count);
+            if i_rst_n = '0' then
+            elsif r_reg_rdy = '1' and is_read then
+                -- Dummy
             end if;
         end if;
-    end process p_handle_in;
+    end process p_read;
+
+    -- Handling writing operations
+    p_write: process(i_clk)
+    begin
+        if rising_edge(i_clk) then
+            o_ccd_sample <= '0';
+            o_rst <= '0';
+
+            if i_rst_n = '0' then
+                o_regmap <= c_regmap_default;
+            elsif r_sample_rolled = '1' and is_write(r_reg_raw(7 downto 4)) then
+                case parse_reg(r_reg_raw(7 downto 4)) is
+                    when REG_SAMPLE =>
+                        o_ccd_sample <= '1';
+
+                    when REG_RESET =>
+                        o_rst <= '1';
+
+                    when REG_CLKDIV =>
+                        o_regmap.clkdiv <= r_in_buf;
+
+                    when REG_SHDIV =>
+                        o_regmap.shdiv <= r_in_buf;
+
+                    when others => null;
+                end case;
+            end if;
+        end if;
+    end process p_write;
 
 end architecture behaviour;

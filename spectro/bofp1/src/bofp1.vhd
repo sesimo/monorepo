@@ -7,10 +7,6 @@ use work.ctrl_common.all;
 use work.vivado.all;
 
 entity bofp1 is
-    generic (
-        G_CFG_WIDTH: integer := 12; -- Width of config entries,
-        G_ADC_WIDTH: integer := 16 -- Width/resoluton of ADC readouts
-    );
     port (
         i_clk: in std_logic;
         i_rst_n: in std_logic;
@@ -38,29 +34,26 @@ entity bofp1 is
 end entity bofp1;
 
 architecture structural of bofp1 is
-    signal r_clk_main: std_logic;
-
     signal r_rst: std_logic;
     signal r_rst_n: std_logic;
     signal r_rst_en: std_logic;
     signal r_rst_gen: std_logic;
 
-    signal r_ccd_start: std_logic; -- Passed to control module
-    signal r_ccd_data_rdy: std_logic;
+    signal r_cap_start: std_logic; -- Driven by control module
+    signal r_cap_data: std_logic_vector(15 downto 0);
+    signal r_cap_rdy: std_logic;
 
-    signal r_adc_spi_sclk2: std_logic;
-    signal r_adc_spi_data: std_logic_vector(G_ADC_WIDTH-1 downto 0);
-    signal r_adc_spi_rdy: std_logic; -- Ready to read out
+    -- Generated clocks
+    signal r_adc_sclk2: std_logic;
+    signal r_clk_main: std_logic;
 
-    signal r_ctrl_fifo_rd_en: std_logic;
-    signal r_ctrl_fifo_val: std_logic_vector(G_ADC_WIDTH-1 downto 0);
-
+    signal r_fifo_rd: std_logic;
+    signal r_fifo_data: std_logic_vector(15 downto 0);
     signal r_fifo_empty: std_logic;
 
     signal r_regmap: t_regmap;
 begin
     r_rst_n <= not r_rst;
-
     r_rst <= '1' when r_rst_gen = '1' or i_rst_n = '0' else '0';
 
     u_reset: entity work.reset(rtl)
@@ -78,71 +71,63 @@ begin
             clk_in1 => i_clk,
             main => r_clk_main,
             sclk_adc => o_spi_main_sclk,
-            sclk2_adc => r_adc_spi_sclk2
+            sclk2_adc => r_adc_sclk2
         );
 
-    u_ccd: entity work.tcd1304(rtl) generic map(
-        G_CLK_FREQ => 100_000_000 -- TODO
-    )
-    port map(
-        i_clk => r_clk_main,
-        i_rst_n => r_rst_n,
-        i_start => r_ccd_start,
-        i_psc_div => r_regmap.clkdiv(7 downto 3), 
-        i_sh_div => r_regmap.shdiv,
-        i_mclk_div => r_regmap.clkdiv(2 downto 0),
+    u_capture: entity work.capture
+        port map(
+            i_clk => r_clk_main,
+            i_rst_n => r_rst_n,
+            i_start => r_cap_start,
+            i_psc_div => r_regmap.clkdiv(7 downto 3), 
+            i_sh_div => r_regmap.shdiv,
+            i_mclk_div => r_regmap.clkdiv(2 downto 0),
 
-        o_pin_sh => o_ccd_sh,
-        o_pin_mclk => o_ccd_mclk,
-        o_pin_icg => o_ccd_icg,
-        o_data_rdy => r_ccd_data_rdy,
-        o_ccd_busy => o_ccd_busy
-    );
+            i_adc_eoc => i_adc_eoc,
+            i_adc_sclk2 => r_adc_sclk2,
+            i_adc_miso => i_spi_main_miso,
+            o_adc_stconv => o_adc_stconv,
+            o_adc_mosi => o_spi_main_mosi,
+            o_adc_cs_n => o_spi_main_cs_n,
 
-    u_adc: entity work.ads8329(rtl) port map(
-        i_clk => r_clk_main,
-        i_rst_n => r_rst_n,
-        i_start => r_ccd_data_rdy,
+            o_pin_sh => o_ccd_sh,
+            o_pin_mclk => o_ccd_mclk,
+            o_pin_icg => o_ccd_icg,
+            o_ccd_busy => o_ccd_busy,
 
-        i_pin_eoc => i_adc_eoc,
-        o_pin_stconv => o_adc_stconv,
+            o_data => r_cap_data,
+            o_data_rdy => r_cap_rdy
+        );
 
-        i_miso => i_spi_main_miso,
-        i_sclk2 => r_adc_spi_sclk2,
-        o_mosi => o_spi_main_mosi,
-        o_cs_n => o_spi_main_cs_n,
+    u_fifo_data: fifo_data
+        port map (
+            rst => r_rst,
+            clk => r_clk_main,
+            wr_en => r_cap_rdy,
+            din => r_cap_data,
+            rd_en => r_fifo_rd,
+            dout => r_fifo_data,
+            empty => r_fifo_empty,
+            prog_full => o_fifo_wmark
+        );
 
-        o_data => r_adc_spi_data,
-        o_rdy => r_adc_spi_rdy
-    );
+    u_ctrl: entity work.ctrl(behaviour)
+        port map(
+            i_clk => r_clk_main,
+            i_rst_n => r_rst_n,
+            o_ccd_sample => r_cap_start,
+            o_rst => r_rst_en,
 
-    u_fifo_data: fifo_data port map (
-        rst => r_rst,
-        clk => r_clk_main,
-        wr_en => r_adc_spi_rdy,
-        din => r_adc_spi_data,
-        rd_en => r_ctrl_fifo_rd_en,
-        dout => r_ctrl_fifo_val,
-        empty => r_fifo_empty,
-        prog_full => o_fifo_wmark
-    );
+            i_sclk => i_spi_sub_sclk,
+            i_cs_n => i_spi_sub_cs_n,
+            i_mosi => i_spi_sub_mosi,
+            o_miso => o_spi_sub_miso,
 
-    u_ctrl: entity work.ctrl(behaviour) port map(
-        i_clk => r_clk_main,
-        i_rst_n => r_rst_n,
-        o_ccd_sample => r_ccd_start,
-        o_rst => r_rst_en,
+            i_fifo_empty => r_fifo_empty,
+            i_fifo_data => r_fifo_data,
+            o_fifo_rd => r_fifo_rd,
 
-        i_sclk => i_spi_sub_sclk,
-        i_cs_n => i_spi_sub_cs_n,
-        i_mosi => i_spi_sub_mosi,
-        o_miso => o_spi_sub_miso,
-
-        i_fifo_empty => r_fifo_empty,
-        i_fifo_data => r_ctrl_fifo_val,
-        o_fifo_rd => r_ctrl_fifo_rd_en,
-
-        o_regmap => r_regmap
-    );
+            o_regmap => r_regmap
+        );
 
 end architecture structural;

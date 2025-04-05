@@ -22,11 +22,20 @@ entity tcd1304 is
         i_mclk_div: in std_logic_vector(2 downto 0);
         i_sh_div: in std_logic_vector(7 downto 0);
 
+        i_adc_eoc: in std_logic;
+        o_adc_stconv: out std_logic;
+        i_adc_sclk2: in std_logic;
+        o_adc_mosi: out std_logic;
+        i_adc_miso: in std_logic;
+        o_adc_cs_n: out std_logic;
+
         o_pin_sh: out std_logic;
         o_pin_icg: out std_logic;
         o_pin_mclk: out std_logic;
+
         o_ccd_busy: out std_logic;
-        o_data_rdy: out std_logic
+        o_data_rdy: out std_logic;
+        o_data: out std_logic_vector(15 downto 0)
     );
 end entity tcd1304;
 
@@ -61,6 +70,9 @@ architecture rtl of tcd1304 is
 
     signal r_data_enable: std_logic;
     signal r_data_rst_n: std_logic;
+    signal r_data_read: std_logic;
+
+    signal r_adc_done: std_logic;
 
     signal r_cnt_rolled: std_logic;
     signal r_icg_rolled: std_logic;
@@ -190,20 +202,26 @@ begin
         o_enable => r_data_enable
     );
 
-    -- Hold data enable in reset when not in capture state
+    -- Hold data enable in reset when not in capture state. This ensures
+    -- that the count starts correctly next time.
     r_data_rst_n <= '0' when (i_rst_n = '0' or r_state /= S_CAPTURE) else '1';
 
-    -- Read out pixel from the ADC
-    p_pix_read: process(i_clk)
-    begin
-        if rising_edge(i_clk) then
-            o_data_rdy <= '0';
+    u_adc: entity work.ads8329(rtl) port map(
+        i_clk => i_clk,
+        i_rst_n => i_rst_n,
+        i_start => r_data_read,
 
-            if r_state = S_CAPTURE then
-                o_data_rdy <= r_data_enable;
-            end if;
-        end if;
-    end process p_pix_read;
+        i_pin_eoc => i_adc_eoc,
+        o_pin_stconv => o_adc_stconv,
+
+        i_miso => i_adc_miso,
+        i_sclk2 => i_adc_sclk2,
+        o_mosi => o_adc_mosi,
+        o_cs_n => o_adc_cs_n,
+
+        o_data => o_data,
+        o_rdy => r_adc_done
+    );
 
     -- Count number of pixels read out from the ADC
     u_pix_cnt: entity work.counter
@@ -213,7 +231,7 @@ begin
         port map(
             i_clk => i_clk,
             i_rst_n => i_rst_n,
-            i_en => r_data_enable,
+            i_en => r_adc_done,
             i_max => std_logic_vector(to_unsigned(G_NUM_ELEMENTS, 12)),
             o_roll => r_cnt_rolled
         );
@@ -266,10 +284,12 @@ begin
         end if;
     end process p_state;
 
+    r_data_read <= r_data_enable when r_state = S_CAPTURE else '0';
     r_icg_buf <= '1' when r_state = S_ICG else '0';
     o_ccd_busy <= '0' when r_state = S_IDLE else '1';
     o_pin_icg <= r_icg_buf;
     o_pin_mclk <= r_mclk_buf;
     o_pin_sh <= r_sh_delayed;
+    o_data_rdy <= r_adc_done;
 
 end architecture rtl;

@@ -113,6 +113,7 @@ begin
 
     b_config: block
         signal r_in_config: boolean;
+        signal r_rdy_delay: std_logic_vector(7 downto 0);
 
         constant c_bit_reset: integer := 0;
     begin
@@ -145,8 +146,11 @@ begin
             if rising_edge(i_clk) then
                 if i_rst_n = '0' then
                     r_config_done <= false;
+                    r_rdy_delay <= (others => '0');
                 else
-                    r_config_done <= r_data_rdy = '1';
+                    r_config_done <= r_rdy_delay(r_rdy_delay'high) = '1';
+                    r_rdy_delay <= r_rdy_delay(r_rdy_delay'high-1 downto 0)
+                                   & r_data_rdy;
                 end if;
             end if;
         end process p_done;

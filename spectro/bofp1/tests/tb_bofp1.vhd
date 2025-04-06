@@ -15,21 +15,18 @@ use bitvis_vip_spi.spi_bfm_pkg.all;
 entity tb_bofp1 is
     generic (
         G_CLK_FREQ: integer := 100_000_000;
-        G_CFG_WIDTH: integer := 12; -- Width of config entries,
-        G_ADC_WIDTH: integer := 16; -- Width/resoluton of ADC readouts
-        G_CTRL_WIDTH: integer := 16; -- Width of ctrl codes
-
-        G_SCLK_DIV: integer := 2
+        G_SCLK_DIV: integer := 7
     );
 end entity tb_bofp1;
 
 architecture bhv of tb_bofp1 is
     signal r_clk:  std_logic;
-    signal r_rst:  std_logic := '1';
+    signal r_rst_n: std_logic;
 
     signal r_ccd_sh:  std_logic;
     signal r_ccd_mclk:  std_logic;
     signal r_ccd_icg:  std_logic;
+    signal r_ccd_busy:  std_logic;
 
     signal r_adc_eoc:  std_logic;
     signal r_adc_stconv:  std_logic;
@@ -45,27 +42,33 @@ architecture bhv of tb_bofp1 is
     constant c_scope: string := C_TB_SCOPE_DEFAULT;
 
     constant c_reg_stream: std_logic_vector(15 downto 0) := x"0000";
-    constant c_reg_sample: std_logic_vector(15 downto 0) := x"1" & x"000";
+    constant c_reg_sample: std_logic_vector(15 downto 0) := x"9" & x"000";
 
     constant c_clk_period: time := (1.0 / real(G_CLK_FREQ)) * (1 sec);
     constant c_sclk_period: time := c_clk_period * G_SCLK_DIV;
 
     constant c_ccd_pix_count: integer := 3694;
+
+    -- Wait to leave reset
+    procedure wait_rst is
+    begin
+        if r_rst_n = '0' or r_rst_n = 'U' then
+            wait until r_rst_n = '1';
+        end if;
+    end procedure wait_rst;
+
 begin
     clock_generator(r_clk, r_clkena, c_clk_period, "OSC Main");
 
     u_dut: entity work.bofp1(structural)
-        generic map(
-            G_CFG_WIDTH => G_CFG_WIDTH,
-            G_ADC_WIDTH => G_ADC_WIDTH
-        )
         port map(
             i_clk => r_clk,
-            i_rst => r_rst,
+            i_rst_n => r_rst_n,
             
             o_ccd_sh => r_ccd_sh,
             o_ccd_mclk => r_ccd_mclk,
             o_ccd_icg => r_ccd_icg,
+            o_ccd_busy => r_ccd_busy,
 
             i_adc_eoc => r_adc_eoc,
             o_adc_stconv => r_adc_stconv,
@@ -83,71 +86,232 @@ begin
             o_spi_sub_miso => r_spi_sub_if.miso
         );
 
-    p_adc: process
+    -- ADC and CCD emulation
+    b_emul: block
+        signal r_dummy_val: unsigned(15 downto 0) := (others => '0');
+        signal r_adc_val: unsigned(r_dummy_val'range);
+        signal r_adc_rst: boolean := false;
+
+        signal r_ccd_running: boolean := false;
+        signal r_ccd_done: boolean := false;
+
+        -- Roughly 25 MHz
+        constant c_adc_clk_per: time := c_clk_period * 4;
     begin
-        r_adc_eoc <= '0';
-        if r_rst = '1' then
-            wait until r_rst = '0';
-        end if;
 
-        wait until r_adc_stconv = '1';
-        wait for 800 ns;
+        -- Emulate readout values
+        p_ccd_data: process(r_ccd_mclk)
+            variable mclk_count: integer range 0 to 3 := 0;
+            variable data_cycles: integer range 0 to 3694 := 0;
+        begin
+            if rising_edge(r_ccd_mclk) then
+                if r_ccd_running then
+                    mclk_count := (mclk_count + 1) mod 4;
 
-        r_adc_eoc <= '1';
-        wait for 100 ns;
-    end process p_adc;
+                    if mclk_count = 0 then
+                        r_dummy_val <= (r_dummy_val + 1) mod c_ccd_pix_count;
+                        data_cycles := (data_cycles + 1) mod 3694;
 
-    p_adc_spi: process
-        variable v_value: unsigned(15 downto 0) := (others => '0');
-    begin
-        if r_rst = '1' then
-            r_spi_main_if <= init_spi_if_signals(
-                config => r_spi_conf,
-                master_mode => false
+                        r_ccd_done <= data_cycles = 0;
+                    end if;
+                end if;
+            end if;
+        end process p_ccd_data;
+
+        -- Handle ICG signal and begin reading out
+        p_ccd_start: process
+            variable start: time;
+        begin
+            wait_rst;
+
+            wait until r_ccd_icg = '1';
+            start := now;
+            wait until r_ccd_icg = '0';
+
+            check_value_in_range(now - start, 1000 ns, 2500 ns, "ICG pulse");
+
+            r_ccd_running <= true;
+            wait until r_ccd_done;
+            r_ccd_running <= false;
+        end process p_ccd_start;
+
+        -- Handle STconv for the ADC and generate EOC along with making data
+        -- ready for the SPI transfer.
+        p_conv: process
+            variable wait_time: time;
+            variable start: time;
+            variable time_diff: time;
+        begin
+            wait_rst;
+
+            wait until r_adc_stconv = '1';
+            start := now;
+
+            -- Wait for ADC to 'detect' start signal
+            wait for c_adc_clk_per;
+            r_adc_eoc <= '0';
+        
+            -- Ideally this would be after the wait period, but because we
+            -- need to wait on STconv in the SPI process in order to receive
+            -- reset command, the value must already be loaded at that point.
+            r_adc_val <= r_dummy_val;
+
+            -- Wait for STconv to be released so that we can check
+            -- duration of the pulse signal. Datasheet specifies that this
+            -- must be held for at least 40 ns.
+            wait_time := c_adc_clk_per * 18;
+            wait until r_adc_stconv = '0' or r_adc_rst;
+
+            if r_adc_rst then
+                wait for c_adc_clk_per;
+                check_value(r_adc_stconv, '1', "STconv must remain high during reset");
+            else
+                -- How long was STconv held?
+                time_diff := now - start;
+                check_value(r_adc_stconv, '0', "STconv pulse value");
+                check_value_in_range(time_diff, 40 ns, wait_time, "STconv pulse len");
+
+                -- Typically takes 18 CCLK cycles to convert. Since we have
+                -- already waited for a while, subtract that time.
+                wait for wait_time - time_diff;
+            end if;
+
+            r_adc_eoc <= '1';
+        end process p_conv;
+
+        -- Handle SPI access to the ADC
+        p_spi: process
+            variable rd_data: std_logic_vector(15 downto 0);
+            variable init_done: boolean := false;
+        begin
+            wait_rst;
+
+            if not init_done then
+                r_spi_main_if <= init_spi_if_signals(
+                    config => r_spi_conf,
+                    master_mode => false
+                );
+
+                init_done := true;
+            end if;
+
+            -- Wait for EOC to be cleared, which means the ADC emulator has
+            -- receieved the STconv signal.
+            wait until r_adc_eoc = '0';
+            wait for 1 ps;
+
+            spi_slave_transmit_and_receive(
+                std_logic_vector(r_adc_val),
+                rd_data,
+                "ADC SPI transaction",
+                r_spi_main_if,
+                config=>r_spi_conf
             );
-            wait until r_rst = '0';
-        end if;
 
-        spi_slave_transmit(
-            std_logic_vector(v_value),
-            "ADC SPI dummy value",
-            r_spi_main_if,
-            config=>r_spi_conf
-        );
+            case rd_data(rd_data'high downto rd_data'high-3) is
+                when x"D" => null;
+                    -- Readout
+                    check_value(r_adc_eoc, '1', "EOC must be high when reading");
 
-        v_value := (v_value + 1) mod c_ccd_pix_count;
-    end process p_adc_spi;
+                when x"E" =>
+                    -- Write CFR
+                    if rd_data(0) = '0' then
+                        check_value(r_adc_stconv, '1',
+                            "STconv must be high when entering reset");
+                        r_adc_rst <= true;
+                        wait for c_adc_clk_per;
+                        r_adc_rst <= false;
+                    end if;
+
+
+                when others => error("Invalid command " & to_hstring(rd_data));
+            end case;
+
+        end process p_spi;
+
+    end block b_emul;
 
     p_main: process
-        procedure release_reset is
-        begin
-            r_rst <= '0';
-        end procedure release_reset;
-
         -- Check the readings from one stream (16 values)
-        procedure check_adc_readings(
-            count: integer;
-            offset: integer;
-            data: std_logic_vector) is
-            variable v_head: integer;
-            variable v_value: integer;
+        procedure check_adc_readings(count: integer; offset: integer;
+                                     data: std_logic_vector) is
+            variable head: integer;
+            variable value: integer;
         begin
             for i in 0 to count-1 loop
-                v_head := data'high - i*16;
-                v_value := offset * 16 + i;
+                head := data'high - i*16;
+                value := offset + i;
+
+                report "Value " & integer'image(value);
 
                 check_value(
-                    data(v_head downto v_head-15),
-                    std_logic_vector(to_unsigned(v_value, 16)),
-                    "Check ADC reading: " & integer'image(v_value)
+                    data(head downto head-15),
+                    std_logic_vector(to_unsigned(value, 16)),
+                    "Check ADC reading: " & integer'image(value)
                 );
             end loop;
         end procedure check_adc_readings;
 
-        variable v_data: std_logic_vector(271 downto 0) := (others => '0');
-        variable v_data_tx: std_logic_vector(v_data'range) := (others => '0');
+        procedure cmd_sample is
+        begin
+            spi_master_transmit(
+                c_reg_sample,
+                "TX sample cmd",
+                r_spi_sub_if,
+                config => r_spi_conf
+            );
+        end procedure cmd_sample;
 
-        variable v_count_remain: integer;
+        procedure check_fifo_read(constant offset: integer;
+                                  constant len: integer) is
+            variable rx_data: std_logic_vector(255 downto 0);
+            variable tx_data: std_logic_vector(rx_data'range) := (others => '0');
+        begin
+            -- Prepare stream command
+            tx_data(tx_data'high downto tx_data'high-15) := c_reg_stream;
+
+            spi_master_transmit_and_receive(
+                tx_data, rx_data, "FIFO stream", r_spi_sub_if,
+                config => r_spi_conf
+            );
+
+            check_adc_readings(len, offset, rx_data(rx_data'high-16 downto 0));
+        end procedure check_fifo_read;
+
+        procedure check_frame is
+            variable offset: integer := 0;
+            variable count: integer;
+
+            constant cnt_per_read: integer := 256 / 16 - 1;
+        begin
+            cmd_sample;
+            wait until r_ccd_busy = '1';
+
+            for i in 0 to c_ccd_pix_count / cnt_per_read loop
+                if r_ccd_busy = '1' then
+                    wait until r_fifo_wmark = '1' or r_ccd_busy = '0';
+                end if;
+
+                if offset >= c_ccd_pix_count - cnt_per_read then
+                    count := c_ccd_pix_count - offset;
+                else
+                    if r_ccd_busy = '0' then
+                        error("Busy fell before reading all");
+                    end if;
+
+                    count := cnt_per_read;
+                end if;
+
+                check_fifo_read(offset, count);
+                offset := offset + count;
+
+                -- Ensure CS is released between
+                wait for 1 ps;
+            end loop;
+
+            wait for 1 ps;
+
+        end procedure check_frame;
     begin
         report_global_ctrl(VOID);
         report_msg_id_panel(VOID);
@@ -155,9 +319,14 @@ begin
 
         log(ID_LOG_HDR, "Simulation setup", c_scope);
         ------------------------------------------------------------------------
+        r_rst_n <= '0';
+
         r_spi_conf.CPOL <= '0';
         r_spi_conf.CPHA <= '1';
         r_spi_conf.spi_bit_time <= c_sclk_period;
+        r_spi_conf.ss_n_to_sclk <= 4 * c_clk_period;
+        r_spi_conf.sclk_to_ss_n <= 4 * c_clk_period;
+        r_spi_conf.inter_word_delay <= c_clk_period;
 
         r_spi_sub_if <= init_spi_if_signals(
             config => r_spi_conf,
@@ -165,47 +334,40 @@ begin
         );
         r_clkena <= true;
 
-        wait for 10 ns;
+        wait for 5 ns;
 
         log(ID_LOG_HDR, "Start simulation SPI main", c_scope);
         log(ID_LOG_HDR, "Bit time: " & time'image(r_spi_conf.spi_bit_time), c_scope);
         ------------------------------------------------------------------------
-        release_reset;
+        r_rst_n <= '1';
         wait for 1 ps;
 
         for j in 0 to 1 loop
-            spi_master_transmit(
-                c_reg_sample,
-                "TX sample cmd",
-                r_spi_sub_if,
-                config => r_spi_conf
-            );
-
-            v_count_remain := c_ccd_pix_count;
-            for i in 0 to 230 loop
-                if i /= 230 then
-                    wait until r_fifo_wmark = '1';
-                else
-                    wait until r_ccd_icg = '0';
-                end if;
-                v_data_tx(v_data_tx'high downto v_data_tx'high-15) := c_reg_stream;
-
-                spi_master_transmit_and_receive(
-                    v_data_tx,
-                    v_data,
-                    "TX stream cmd",
-                    r_spi_sub_if,
-                    config => r_spi_conf
-                );
-
-                if v_count_remain >= 16 then
-                    v_count_remain := v_count_remain - 16;
-                    check_adc_readings(16, i, v_data(v_data'high - 16 downto 0));
-                else
-                    check_adc_readings(v_count_remain, i, v_data(v_data'high - 16 downto 0));
-                end if;
-            end loop;
+            check_frame;
         end loop;
+        
+        spi_master_transmit(
+            x"b0a7",
+            "Update clkdiv",
+            r_spi_sub_if,
+            config => r_spi_conf
+        );
+        
+        spi_master_transmit(
+            x"c034",
+            "Update shdiv",
+            r_spi_sub_if,
+            config => r_spi_conf
+        );
+
+        spi_master_transmit(
+            x"a000",
+            "Reset",
+            r_spi_sub_if,
+            config => r_spi_conf
+        );
+
+        wait for 5 us;
 
         -- End simulation
         ------------------------------------------------------------------------

@@ -26,7 +26,7 @@
 #define BOFP1_NUM_ELEMENTS_TOTAL                                               \
         (BOFP1_NUM_ELEMENTS_REAL + BOFP1_NUM_ELEMENTS_DUMMY)
 
-#define BOFP1_BUSY    (0) /* Sensor busy */
+#define BOFP1_BUSY (0) /* Sensor busy */
 
 #define BOFP1_TIMEOUT    (K_MSEC(10))
 

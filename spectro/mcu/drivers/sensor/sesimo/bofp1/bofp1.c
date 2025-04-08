@@ -176,7 +176,7 @@ int bofp1_enable_read(const struct device *dev)
 {
         int status;
         const struct bofp1_cfg *cfg = dev->config;
-        struct bofp1_data* data = dev->data;
+        struct bofp1_data *data = dev->data;
 
         status = gpio_pin_interrupt_configure_dt(&cfg->fifo_w_gpios,
                                                  GPIO_INT_EDGE_TO_ACTIVE);

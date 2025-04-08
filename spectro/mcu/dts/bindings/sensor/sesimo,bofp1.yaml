@@ -20,10 +20,13 @@ properties:
 
   clkdiv:
     type: int
-    default: 0
+    default: 62
     description: |
       Clock divider value. The master clock frequency for the CCD is given
-      by `f = clock-frequency / (25 + 100/7 * clkdiv)`
+      by `f = clock-frequency / clkdiv`. This can not be changed, and should
+      be the same as the value used on the FPGA.
+
+      Defaults to 62, which gives ~1.6MHz operating frequency.
 
   integration-time:
     type: int
@@ -31,7 +34,7 @@ properties:
     description: |
       Set integration time (in nanoseconds). The integration time is determined
       by the periodicity of the SH signal on the FPGA. The frequency of this
-      signal is given by `f = MCLK/((PSC+1) * SH)`, that is, it is
+      signal is given by `f = MCLK/((PSC+1) * (SH+1))`, that is, it is
       dependent on both the MCLK frequency and the PSC value. The integration
       time attribute only adjusts the SH value, so MCLK and PSC may need
       to be manually adjusted to obtain the best possible frequnecy.

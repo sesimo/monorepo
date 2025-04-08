@@ -121,6 +121,34 @@ int spectro_sample(spectro_data_rdy_cb cb, void *user_arg)
         return k_msgq_put(&msgq, &entry, K_NO_WAIT);
 }
 
+uint32_t spectro_get_int_time(void)
+{
+        struct sensor_value val;
+
+        (void)sensor_attr_get(
+                dev, SENSOR_CHAN_VOLTAGE,
+                (enum sensor_attribute)SENSOR_ATTR_BOFP1_INTEGRATION, &val);
+
+        return val.val1 / 1000;
+}
+
+int spectro_set_int_time(uint32_t int_us)
+{
+        int status;
+        struct sensor_value val;
+
+        (void)k_mutex_lock(&lock, K_FOREVER);
+
+        val.val1 = int_us * 1000;
+        status = sensor_attr_set(
+                dev, SENSOR_CHAN_VOLTAGE,
+                (enum sensor_attribute)SENSOR_ATTR_BOFP1_INTEGRATION, &val);
+
+        (void)k_mutex_unlock(&lock);
+
+        return status;
+}
+
 static void aq_thread(void *p1, void *p2, void *p3)
 {
         int status;

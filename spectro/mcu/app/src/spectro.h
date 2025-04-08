@@ -28,4 +28,21 @@ int spectro_sample(spectro_data_rdy_cb cb, void *user_arg);
  */
 int spectro_stream_read(void *buf, size_t size, size_t *real_size);
 
+/**
+ * @brief Get current integration time
+ *
+ * @return uint32_t Integration time in microseconds
+ */
+uint32_t spectro_get_int_time(void);
+
+/**
+ * @brief Set integration time
+ *
+ * @param int_us Integration time in microseconds
+ * @return int
+ * @retval 0 Success
+ * @retval <0 Negative errno code
+ */
+int spectro_set_int_time(uint32_t int_us);
+
 #endif /* SPECTRO_H__ */

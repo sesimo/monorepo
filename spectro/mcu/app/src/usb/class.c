@@ -11,7 +11,8 @@
 
 LOG_MODULE_REGISTER(bomc1_usb);
 
-#define BOMC1_VRQ_SPECTRO_READ (0x1) /* Begin CCD read */
+#define BOMC1_VRQ_SPECTRO_READ     (0x1) /* Begin CCD read */
+#define BOMC1_VRQ_SPECTRO_INT_TIME (0x2) /* Integration time */
 
 #define BOMC1_TX_ENABLED (0)
 #define BOMC1_TX_BUSY    (1)
@@ -160,6 +161,19 @@ static int bomc1_usbd_cth(struct usbd_class_data *const c_data,
                           struct net_buf *const buf)
 {
         LOG_DBG("vendor request %" PRIu8 " (to host)", setup->bRequest);
+
+        switch (setup->bRequest) {
+        case BOMC1_VRQ_SPECTRO_INT_TIME:
+                if (buf == NULL || setup->wLength < sizeof(uint32_t)) {
+                        return -ENOMEM;
+                }
+
+                net_buf_add_le32(buf, spectro_get_int_time());
+                return 0;
+        default:
+                break;
+        }
+
         return -ENOTSUP;
 }
 
@@ -168,6 +182,7 @@ static int bomc1_usbd_ctd(struct usbd_class_data *const c_data,
                           const struct net_buf *const buf)
 {
         int status;
+        uint32_t int_time;
         struct bomc1_usb_ctx *ctx = usbd_class_get_private(c_data);
 
         LOG_DBG("vendor request %" PRIu8 " (to device)", setup->bRequest);
@@ -182,6 +197,13 @@ static int bomc1_usbd_ctd(struct usbd_class_data *const c_data,
                 }
 
                 break;
+        case BOMC1_VRQ_SPECTRO_INT_TIME:
+                if (setup->wLength != sizeof(int_time)) {
+                        return -ENOTSUP;
+                }
+
+                int_time = sys_get_le32(buf->data);
+                return spectro_set_int_time(int_time);
         default:
                 return -ENOTSUP;
         }
@@ -292,7 +314,7 @@ static struct bomc1_usb_ctx bomc1_usb_ctx = {
 };
 
 struct usbd_cctx_vendor_req bomc1_usb_vendor_req =
-        USBD_VENDOR_REQ(BOMC1_VRQ_SPECTRO_READ);
+        USBD_VENDOR_REQ(BOMC1_VRQ_SPECTRO_READ, BOMC1_VRQ_SPECTRO_INT_TIME);
 
 USBD_DEFINE_CLASS(bomc1_usb, &bomc1_usb_api, &bomc1_usb_ctx,
                   &bomc1_usb_vendor_req);

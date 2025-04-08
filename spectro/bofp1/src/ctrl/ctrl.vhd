@@ -195,8 +195,8 @@ begin
                     when REG_RESET =>
                         o_rst <= '1';
 
-                    when REG_CLKDIV =>
-                        o_regmap.clkdiv <= r_in_buf;
+                    when REG_PSCDIV =>
+                        o_regmap.pscdiv <= r_in_buf;
 
                     when REG_SHDIV =>
                         o_regmap.shdiv <= r_in_buf;

@@ -7,20 +7,20 @@ package ctrl_common is
     constant c_reg_width: integer := 4;
 
     type t_regmap is record
-        clkdiv: std_logic_vector(7 downto 0);
+        pscdiv: std_logic_vector(7 downto 0);
         shdiv: std_logic_vector(7 downto 0);
     end record t_regmap;
 
     constant c_regmap_default: t_regmap := (
-        clkdiv => std_logic_vector(to_unsigned(1, 8)),
-        shdiv => std_logic_vector(to_unsigned(1, 8))
+        pscdiv => std_logic_vector(to_unsigned(15, 8)),
+        shdiv => std_logic_vector(to_unsigned(9, 8))
     );
 
     type t_reg is (
         REG_STREAM,
         REG_SAMPLE,
         REG_RESET,
-        REG_CLKDIV,
+        REG_PSCDIV,
         REG_SHDIV
     );
     subtype t_reg_vector is std_logic_vector(c_reg_width-1 downto 0);

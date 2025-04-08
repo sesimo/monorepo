@@ -18,8 +18,7 @@ entity tcd1304 is
         i_clk: in std_logic;
         i_rst_n: in std_logic;
         i_start: in std_logic;
-        i_psc_div: in std_logic_vector(4 downto 0);
-        i_mclk_div: in std_logic_vector(2 downto 0);
+        i_psc_div: in std_logic_vector(7 downto 0);
         i_sh_div: in std_logic_vector(7 downto 0);
 
         i_adc_eoc: in std_logic;
@@ -46,17 +45,12 @@ architecture rtl of tcd1304 is
     constant c_sh_pulse: integer := G_SH_CYC_NS / (1_000_000_000 / G_CLK_FREQ);
     constant c_icg_cyc: integer := G_ICG_HOLD_NS / (1_000_000_000 / G_CLK_FREQ);
 
-    constant c_mclk_div_lowest: integer := G_CLK_FREQ / 4_000_000;
-    constant c_mclk_div_highest: integer := G_CLK_FREQ / 800_000;
-    constant c_mclk_div_diff: integer := (
-        (c_mclk_div_highest - c_mclk_div_lowest) / 7
-    );
+    constant c_mclk_count: integer := G_CLK_FREQ / 1_600_000;
+    constant c_mclk_pulse: integer := c_mclk_count / 2;
 
     signal r_icg_buf: std_logic;
 
     signal r_mclk_buf: std_logic;
-    signal r_mclk_cnt: std_logic_vector(G_MCLK_DIV_WIDTH-1 downto 0);
-    signal r_mclk_pulse: std_logic_vector(G_MCLK_DIV_WIDTH-1 downto 0);
     signal r_mclk_en: std_logic;
 
     signal r_psc_en: std_logic;
@@ -83,28 +77,6 @@ begin
     r_sh_div <= std_logic_vector(resize(
                  unsigned(i_sh_div) + 1, r_sh_div'length));
 
-    -- Adjust the MCLK count value and pulse width
-    p_mclk_adjust: process(i_clk)
-    begin
-        if rising_edge(i_clk) then
-            if i_rst_n = '0' then
-                r_mclk_cnt <= (others => '1');
-                r_mclk_pulse <= (others => '1');
-            else
-                r_mclk_cnt <= std_logic_vector(to_unsigned(
-                    c_mclk_div_lowest +
-                        c_mclk_div_diff * to_integer(unsigned(i_mclk_div)),
-                    G_MCLK_DIV_WIDTH
-                ));
-
-                r_mclk_pulse <= std_logic_vector(resize(
-                    unsigned(r_mclk_cnt) srl 1,
-                    G_MCLK_DIV_WIDTH
-                ));
-            end if;
-        end if;
-    end process p_mclk_adjust;
-
     -- Counter for the master clock. This triggers a one-cycle enable
     -- signal continously
     u_counter_mclk: entity work.counter(rtl)
@@ -115,7 +87,7 @@ begin
             i_clk => i_clk,
             i_rst_n => i_rst_n,
             i_en => '1',
-            i_max => r_mclk_cnt,
+            i_max => std_logic_vector(to_unsigned(c_mclk_count, G_MCLK_DIV_WIDTH)),
             o_roll => r_mclk_en
         );
     
@@ -128,14 +100,14 @@ begin
             i_clk => i_clk,
             i_rst_n => i_rst_n,
             i_en => r_mclk_en,
-            i_cyc_cnt => r_mclk_pulse,
+            i_cyc_cnt => std_logic_vector(to_unsigned(c_mclk_pulse, G_MCLK_DIV_WIDTH)),
             o_out => r_mclk_buf
         );
 
     -- Counter for the prescaler
     u_counter_psc: entity work.counter(rtl)
         generic map(
-            G_WIDTH => 6
+            G_WIDTH => r_psc_div'length
         )
         port map(
             i_clk => i_clk,
@@ -148,7 +120,7 @@ begin
     -- Counter for SH signal
     u_counter_sh: entity work.counter(rtl)
         generic map(
-            G_WIDTH => 9
+            G_WIDTH => r_sh_div'length
         )
         port map(
             i_clk => i_clk,

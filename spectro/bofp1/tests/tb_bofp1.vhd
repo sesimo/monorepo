@@ -347,8 +347,8 @@ begin
         end loop;
         
         spi_master_transmit(
-            x"b0a7",
-            "Update clkdiv",
+            x"b0f3",
+            "Update pscdiv",
             r_spi_sub_if,
             config => r_spi_conf
         );

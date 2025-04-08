@@ -170,14 +170,9 @@ static void aq_thread(void *p1, void *p2, void *p3)
 
                 /* Reset frame iterator */
                 decode_ctx.fit = 0;
-#if 0
-
 
                 status = sensor_read(&iodev, &rtio_ctx, (uint8_t *)spectro_buf,
                                      sizeof(spectro_buf));
-#else
-                status = 0;
-#endif
                 (void)k_mutex_unlock(&lock);
 
                 if (status != 0) {

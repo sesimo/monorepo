@@ -45,7 +45,7 @@ architecture rtl of tcd1304 is
     constant c_sh_pulse: integer := G_SH_CYC_NS / (1_000_000_000 / G_CLK_FREQ);
     constant c_icg_cyc: integer := G_ICG_HOLD_NS / (1_000_000_000 / G_CLK_FREQ);
 
-    constant c_mclk_count: integer := G_CLK_FREQ / 1_600_000;
+    constant c_mclk_count: integer := G_CLK_FREQ / 800_000;
     constant c_mclk_pulse: integer := c_mclk_count / 2;
 
     signal r_icg_buf: std_logic;

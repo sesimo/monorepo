@@ -118,6 +118,11 @@ int spectro_sample(spectro_data_rdy_cb cb, void *user_arg)
                 .user_arg = user_arg,
         };
 
+        if (!device_is_ready(dev)) {
+                LOG_ERR("spectrometer driver not initialized");
+                return -EBUSY;
+        }
+
         return k_msgq_put(&msgq, &entry, K_NO_WAIT);
 }
 

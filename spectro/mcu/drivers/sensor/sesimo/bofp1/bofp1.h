@@ -81,6 +81,8 @@ void bofp1_submit(const struct device *dev, struct rtio_iodev_sqe *sqe);
 int bofp1_get_decoder(const struct device *dev,
                       const struct sensor_decoder_api **decoder);
 
+bool bofp1_gpio_check(const struct device *dev);
+
 void bofp1_rtio_read(const struct device *dev);
 
 void bofp1_rtio_watchdog(struct k_work *work);

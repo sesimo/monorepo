@@ -200,6 +200,19 @@ int bofp1_disable_read(const struct device *dev)
         return status;
 }
 
+static void bofp1_busy_fall(const struct device *dev)
+{
+        struct bofp1_data *data = dev->data;
+
+        if (!atomic_test_and_clear_bit(&data->state, BOFP1_BUSY)) {
+                return;
+        }
+
+        LOG_ERR("sampling done");
+
+        bofp1_rtio_read(data->dev);
+}
+
 static void bofp1_busy_fall_cb(const struct device *gpio,
                                struct gpio_callback *cb, gpio_port_pins_t pins)
 {
@@ -210,11 +223,19 @@ static void bofp1_busy_fall_cb(const struct device *gpio,
 
         data = CONTAINER_OF(cb, struct bofp1_data, busy_fall_cb);
 
-        if (!atomic_test_and_clear_bit(&data->state, BOFP1_BUSY)) {
+        bofp1_busy_fall(data->dev);
+}
+
+static void bofp1_fifo_wmark(const struct device *dev)
+{
+        struct bofp1_data *data = dev->data;
+
+        LOG_ERR("fifo watermark hit");
+
+        if (!atomic_test_bit(&data->state, BOFP1_BUSY)) {
+                LOG_ERR("fifo wmark when not busy");
                 return;
         }
-
-        LOG_ERR("sampling done");
 
         bofp1_rtio_read(data->dev);
 }
@@ -229,14 +250,22 @@ static void bofp1_fifo_wmark_cb(const struct device *gpio,
 
         data = CONTAINER_OF(cb, struct bofp1_data, fifo_w_cb);
 
-        LOG_ERR("fifo watermark hit");
+        bofp1_fifo_wmark(data->dev);
+}
 
-        if (!atomic_test_bit(&data->state, BOFP1_BUSY)) {
-                LOG_ERR("fifo wmark when not busy");
-                return;
+bool bofp1_gpio_check(const struct device *dev)
+{
+        const struct bofp1_cfg *cfg = dev->config;
+
+        if (gpio_pin_get_dt(&cfg->busy_gpios) == 0) {
+                bofp1_busy_fall(dev);
+        } else if (gpio_pin_get_dt(&cfg->fifo_w_gpios) > 0) {
+                bofp1_fifo_wmark(dev);
+        } else {
+                return false;
         }
 
-        bofp1_rtio_read(data->dev);
+        return true;
 }
 
 static DEVICE_API(sensor, bofp1_api) = {

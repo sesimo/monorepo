@@ -158,7 +158,9 @@ static void bofp1_rtio_continue(struct rtio *r, const struct rtio_sqe *sqe,
         ARG_UNUSED(r);
         ARG_UNUSED(sqe);
 
-        bofp1_enable_read(dev_arg);
+        if (!bofp1_gpio_check(dev_arg)) {
+                bofp1_enable_read(dev_arg);
+        }
 }
 
 static void bofp1_data_read(const struct device *dev)

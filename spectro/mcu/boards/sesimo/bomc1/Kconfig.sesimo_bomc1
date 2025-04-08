@@ -1,0 +1,3 @@
+
+config BOARD_SESIMO_BOMC1
+    select SOC_STM32F103XB

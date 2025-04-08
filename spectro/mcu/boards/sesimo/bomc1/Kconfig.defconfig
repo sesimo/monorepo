@@ -1,0 +1,7 @@
+
+if BOARD_SESIMO_BOMC1
+
+config NUM_IRQS
+    default 68
+
+endif

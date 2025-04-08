@@ -1,0 +1,20 @@
+identifier: sesimo_bomc1
+name: SESIMO BOMC1 Spectrometer MCU
+type: mcu
+arch: arm
+toolchain:
+  - zephyr
+  - gnuarmemb
+ram: 48
+flash: 256
+supported:
+  - gpio
+  - spi
+  - pwm
+  - watchdog
+  - adc
+  - dma
+  - nvs
+  - counter
+  - usb
+vendor: st

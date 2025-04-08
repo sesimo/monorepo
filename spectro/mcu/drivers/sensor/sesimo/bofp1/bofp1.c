@@ -154,7 +154,7 @@ static int bofp1_set_integration_time(const struct device *dev,
         return 0;
 }
 
-int bofp1_reset(const struct device *dev)
+static int bofp1_reset(const struct device *dev)
 {
         return bofp1_write_reg(dev, BOFP1_REG_RESET, 0);
 }
@@ -206,9 +206,12 @@ int bofp1_enable_read(const struct device *dev)
 {
         int status;
         const struct bofp1_cfg *cfg = dev->config;
+        struct bofp1_data* data = dev->data;
 
         status = gpio_pin_interrupt_configure_dt(&cfg->fifo_w_gpios,
                                                  GPIO_INT_EDGE_TO_ACTIVE);
+
+        k_work_reschedule(&data->watchdog_work, BOFP1_TIMEOUT);
 
         return status;
 }
@@ -217,6 +220,9 @@ int bofp1_disable_read(const struct device *dev)
 {
         int status;
         const struct bofp1_cfg *cfg = dev->config;
+        struct bofp1_data *data = dev->data;
+
+        k_work_cancel_delayable(&data->watchdog_work);
 
         status = gpio_pin_interrupt_configure_dt(&cfg->fifo_w_gpios,
                                                  GPIO_INT_DISABLE);
@@ -303,6 +309,8 @@ static int bofp1_init(const struct device *dev)
         if (!spi_is_ready_dt(&cfg->bus)) {
                 return -EBUSY;
         }
+
+        k_work_init_delayable(&data->watchdog_work, bofp1_rtio_watchdog);
 
         status = bofp1_init_gpio(&cfg->busy_gpios, bofp1_busy_fall_cb,
                                  &data->busy_fall_cb, BIT(cfg->busy_gpios.pin));

@@ -15,6 +15,15 @@ static inline size_t bofp1_frame_size(void)
         return BOFP1_NUM_ELEMENTS_TOTAL * sizeof(uint16_t);
 }
 
+static void bofp1_set_status(const struct device *dev, int status)
+{
+        struct bofp1_data *data = dev->data;
+
+        if (!atomic_cas(&data->status, 0, status)) {
+                LOG_WRN("unable to set status; already set");
+        }
+}
+
 static void bofp1_submit_fetch(struct rtio_iodev_sqe *iodev_sqe)
 {
         int status;
@@ -33,6 +42,7 @@ static void bofp1_submit_fetch(struct rtio_iodev_sqe *iodev_sqe)
 
         status = bofp1_enable_read(dev);
         if (status != 0) {
+                atomic_clear_bit(&data->state, BOFP1_BUSY);
                 rtio_iodev_sqe_err(iodev_sqe, status);
                 return;
         }
@@ -40,15 +50,21 @@ static void bofp1_submit_fetch(struct rtio_iodev_sqe *iodev_sqe)
         status = rtio_sqe_rx_buf(iodev_sqe, bofp1_frame_size(),
                                  bofp1_frame_size(), &data->wr_buf, &real_len);
         if (status != 0) {
+                (void)bofp1_disable_read(dev);
+                atomic_clear_bit(&data->state, BOFP1_BUSY);
                 rtio_iodev_sqe_err(iodev_sqe, status);
                 return;
         }
 
         sqe = rtio_sqe_acquire(data->rtio_ctx);
         if (sqe == NULL) {
+                (void)bofp1_disable_read(dev);
+                atomic_clear_bit(&data->state, BOFP1_BUSY);
                 rtio_iodev_sqe_err(iodev_sqe, -ENOMEM);
                 return;
         }
+
+        atomic_set(&data->status, 0);
 
         reg[0] = BOFP1_WRITE_REG(BOFP1_REG_SAMPLE);
         reg[1] = 0;
@@ -86,7 +102,51 @@ static void bofp1_rtio_finish(struct rtio *r, const struct rtio_sqe *sqe,
         ARG_UNUSED(r);
         ARG_UNUSED(sqe);
 
-        bofp1_finish(dev_arg, 0);
+        const struct device *dev = dev_arg;
+        struct bofp1_data *data = dev->data;
+
+        bofp1_finish(dev_arg, atomic_get(&data->status));
+}
+
+/** @brief Reset and reconfigure using RTIO methods */
+static void bofp1_rtio_err(struct rtio *r, const struct rtio_sqe *sqe,
+                           void *dev_arg)
+{
+        ARG_UNUSED(sqe);
+
+        uint8_t reg_reset[2];
+        uint8_t reg_conf[2];
+        const struct device *dev = dev_arg;
+        struct bofp1_data *data = dev->data;
+        struct rtio_sqe *reset;
+        struct rtio_sqe *conf;
+        struct rtio_sqe *finish;
+
+        reset = rtio_sqe_acquire(data->rtio_ctx);
+        conf = rtio_sqe_acquire(data->rtio_ctx);
+        finish = rtio_sqe_acquire(data->rtio_ctx);
+
+        LOG_INF("resetting FPGA");
+
+        /* The FPGA can handle two consecutive commands, but it requires
+         * some clock cycles to perform the reset and we should therefore split
+         * the transaction into two. The delay on the micro between these two
+         * packets will be more than enough. */
+        reg_reset[0] = BOFP1_WRITE_REG(BOFP1_REG_RESET); /* Reset */
+        reg_reset[1] = 0;
+        reg_conf[0] = BOFP1_WRITE_REG(BOFP1_REG_CCD_SH); /* Set SH div */
+        reg_conf[1] = data->shdiv;
+        rtio_sqe_prep_tiny_write(reset, data->iodev_bus, RTIO_PRIO_NORM,
+                                 reg_reset, sizeof(reg_reset), NULL);
+        rtio_sqe_prep_tiny_write(conf, data->iodev_bus, RTIO_PRIO_NORM,
+                                 reg_conf, sizeof(reg_conf), NULL);
+
+        reset->flags = RTIO_SQE_CHAINED;
+        conf->flags = RTIO_SQE_CHAINED;
+
+        rtio_sqe_prep_callback(finish, bofp1_rtio_finish, (void *)dev, NULL);
+
+        rtio_submit(data->rtio_ctx, 0);
 }
 
 static void bofp1_rtio_continue(struct rtio *r, const struct rtio_sqe *sqe,
@@ -123,9 +183,11 @@ static void bofp1_data_read(const struct device *dev)
 
                 if (!atomic_test_bit(&data->state, BOFP1_BUSY)) {
                         LOG_ERR("sensor completed while data is still in fifo");
-                        /* TODO: proper rtio reset */
-                        (void)bofp1_reset(dev);
-                        bofp1_finish(dev, -EBUSY);
+                        cb_action = rtio_sqe_acquire(data->rtio_ctx);
+
+                        bofp1_set_status(dev, -EBUSY);
+                        rtio_sqe_prep_callback(cb_action, bofp1_rtio_err,
+                                               (void *)dev, NULL);
                         goto exit;
                 }
         }
@@ -176,6 +238,18 @@ static void bofp1_data_read_work(struct rtio_iodev_sqe *iodev_sqe)
         bofp1_data_read(dev);
 }
 
+static void bofp1_abort_work(struct rtio_iodev_sqe *iodev_sqe)
+{
+        const struct sensor_read_config *config = iodev_sqe->sqe.iodev->data;
+        const struct device *dev = config->sensor;
+        struct bofp1_data *data = dev->data;
+
+        LOG_ERR("timed out");
+
+        bofp1_set_status(dev, -ETIMEDOUT);
+        bofp1_rtio_err(data->rtio_ctx, NULL, (void *)dev);
+}
+
 void bofp1_submit(const struct device *dev, struct rtio_iodev_sqe *iodev_sqe)
 {
         struct rtio_work_req *work;
@@ -197,4 +271,19 @@ void bofp1_rtio_read(const struct device *dev)
         __ASSERT_NO_MSG(status == 0);
 
         rtio_work_req_submit(req, data->iodev_sqe, bofp1_data_read_work);
+}
+
+void bofp1_rtio_watchdog(struct k_work *work)
+{
+        int status;
+        struct rtio_work_req *req;
+        struct k_work_delayable *dwork = k_work_delayable_from_work(work);
+        struct bofp1_data *data =
+                CONTAINER_OF(dwork, struct bofp1_data, watchdog_work);
+
+        status = bofp1_disable_read(data->dev);
+        __ASSERT_NO_MSG(status == 0);
+
+        req = rtio_work_req_alloc();
+        rtio_work_req_submit(req, data->iodev_sqe, bofp1_abort_work);
 }

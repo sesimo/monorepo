@@ -39,6 +39,8 @@
 
 #define BOFP1_BUSY    (0) /* Sensor busy */
 
+#define BOFP1_TIMEOUT (K_MSEC(2))
+
 struct bofp1_cfg {
         uint8_t psc;
         uint8_t clkdiv_dt;
@@ -71,7 +73,10 @@ struct bofp1_data {
 
         struct k_spinlock lock;
 
+        struct k_work_delayable watchdog_work;
+
         atomic_t state;
+        atomic_t status;
 };
 
 int bofp1_access(const struct device *dev, bool write, uint8_t addr, void *data,
@@ -85,12 +90,12 @@ int bofp1_read_reg(const struct device *dev, uint8_t addr, uint8_t *value);
 
 void bofp1_submit(const struct device *dev, struct rtio_iodev_sqe *sqe);
 
-int bofp1_reset(const struct device *dev);
-
 int bofp1_get_decoder(const struct device *dev,
                       const struct sensor_decoder_api **decoder);
 
 void bofp1_rtio_read(const struct device *dev);
+
+void bofp1_rtio_watchdog(struct k_work *work);
 
 int bofp1_enable_read(const struct device *dev);
 

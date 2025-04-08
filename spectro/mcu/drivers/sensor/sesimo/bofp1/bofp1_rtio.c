@@ -290,6 +290,8 @@ void bofp1_rtio_watchdog(struct k_work *work)
         status = bofp1_disable_read(data->dev);
         __ASSERT_NO_MSG(status == 0);
 
+        atomic_clear_bit(&data->state, BOFP1_BUSY);
+
         req = rtio_work_req_alloc();
         rtio_work_req_submit(req, data->iodev_sqe, bofp1_abort_work);
 }

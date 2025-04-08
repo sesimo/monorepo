@@ -91,7 +91,7 @@ int spectro_stream_read(void *buf_arg, size_t size_arg, size_t *real_size)
                 }
 
                 value = convert_voltage(data.readings[0].voltage, data.shift);
-                sys_put_be16(value, buf);
+                sys_put_le16(value, buf);
 
                 size -= sizeof(uint16_t);
                 buf += sizeof(uint16_t);

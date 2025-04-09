@@ -152,12 +152,12 @@ begin
         variable is_read: boolean;
     begin
         if rising_edge(i_clk) then
-            is_read := not is_write(r_reg_raw(7 downto 4));
+            is_read := not is_write(r_reg_raw);
 
             if r_rst_n_mux = '0' then
                 r_streaming <= false;
             elsif r_shift_rolled = '1' and is_read then
-                if parse_reg(r_reg_raw(7 downto 4)) = REG_STREAM then
+                if parse_reg(r_reg_raw) = REG_STREAM then
                     r_streaming <= true;
                 end if;
             end if;
@@ -169,7 +169,7 @@ begin
         variable is_read: boolean;
     begin
         if rising_edge(i_clk) then
-            is_read := not is_write(r_reg_raw(7 downto 4));
+            is_read := not is_write(r_reg_raw);
 
             if i_rst_n = '0' then
             elsif r_reg_rdy = '1' and is_read then
@@ -180,6 +180,7 @@ begin
 
     -- Handling writing operations
     p_write: process(i_clk)
+        variable reg: t_reg;
     begin
         if rising_edge(i_clk) then
             o_ccd_sample <= '0';
@@ -187,22 +188,18 @@ begin
 
             if i_rst_n = '0' then
                 o_regmap <= c_regmap_default;
-            elsif r_sample_rolled = '1' and is_write(r_reg_raw(7 downto 4)) then
-                case parse_reg(r_reg_raw(7 downto 4)) is
+            elsif r_sample_rolled = '1' and is_write(r_reg_raw) then
+                reg := parse_reg(r_reg_raw);
+
+                case reg is
                     when REG_SAMPLE =>
                         o_ccd_sample <= '1';
 
                     when REG_RESET =>
                         o_rst <= '1';
 
-                    when REG_SHDIV1 =>
-                        o_regmap.shdiv1 <= r_in_buf;
-
-                    when REG_SHDIV2 =>
-                        o_regmap.shdiv2 <= r_in_buf;
-
-                    when REG_SHDIV3 =>
-                        o_regmap.shdiv3 <= r_in_buf;
+                    when REG_SHDIV1 | REG_SHDIV2 | REG_SHDIV3 =>
+                        set_reg(o_regmap, reg, r_in_buf);
 
                     when others => null;
                 end case;

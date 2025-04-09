@@ -54,6 +54,22 @@ package ctrl_common is
     -- retval true Write operation
     -- retval false Read operation
     function is_write(code: t_reg_vector) return boolean;
+
+    type t_err is (
+        ERR_FIFO_OVERFLOW,
+        ERR_FIFO_UNDERFLOW
+    );
+    constant c_err_len: integer := t_err'pos(t_err'high) + 1;
+    subtype t_err_bitmap is std_logic_vector(c_err_len-1 downto 0);
+
+    -- brief Get the error slot, that is the bit in the bitmap, for the
+    -- given error code `err`
+    function get_err_slot(bitmap: t_reg_vector; err: t_err) return std_logic;
+
+    -- brief Set error in bitmap
+    procedure set_err(signal bitmap: out t_err_bitmap; constant err: in t_err;
+                      constant val: in std_logic);
+
 end package ctrl_common;
 
 package body ctrl_common is
@@ -82,5 +98,16 @@ package body ctrl_common is
     begin
         return code(code'high) = '1';
     end function is_write;
+
+    function get_err_slot(bitmap: t_reg_vector; err: t_err) return std_logic is
+    begin
+        return bitmap(t_err'pos(err));
+    end function get_err_slot;
+
+    procedure set_err(signal bitmap: out t_err_bitmap; constant err: in t_err;
+                      constant val: in std_logic) is
+    begin
+        bitmap(t_err'pos(err)) <= val;
+    end procedure set_err;
 
 end package body ctrl_common;

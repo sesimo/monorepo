@@ -18,10 +18,11 @@ entity ctrl is
         i_mosi: in std_logic;
         o_miso: out std_logic;
 
-        i_fifo_empty: in std_logic;
         i_fifo_data: in std_logic_vector(15 downto 0);
         o_fifo_rd: out std_logic;
-        o_regmap: out t_regmap
+    
+        i_errors: in t_err_bitmap;
+        io_regmap: inout t_regmap
     );
 end entity ctrl;
 
@@ -49,6 +50,9 @@ architecture behaviour of ctrl is
     signal r_reg_raw: std_logic_vector(7 downto 0);
     signal r_reg_rdy: std_logic;
 
+    signal r_errors: t_err_bitmap;
+    signal r_err_clear: std_logic;
+
     -- Current range of the SPI output shift register
     function cur_shf_range(data: std_logic_vector; count: unsigned)
     return std_logic_vector is
@@ -61,6 +65,16 @@ architecture behaviour of ctrl is
 begin
     r_rst_n_mux <= '0' when (i_rst_n = '0' or r_spi_active = '0') else '1';
     r_out <= i_fifo_data;
+
+    -- Set errors in the regmap.
+    u_err: entity work.ctrl_err
+        port map(
+            i_clk => i_clk,
+            i_rst_n => i_rst_n,
+            i_clear => r_err_clear,
+            i_rising => r_errors or i_errors,
+            o_persisted => io_regmap(t_reg'pos(REG_STATUS))(c_err_len-1 downto 0)
+        );
 
     u_spi: entity work.spi_sub(rtl)
         generic map(
@@ -124,7 +138,7 @@ begin
         if rising_edge(i_clk) then
             o_fifo_rd <= '0';
 
-            if r_streaming and r_shift_rolled = '1' and i_fifo_empty /= '1' then
+            if r_streaming and r_shift_rolled = '1' then
                 o_fifo_rd <= '1';
             end if;
         end if;
@@ -185,9 +199,10 @@ begin
         if rising_edge(i_clk) then
             o_ccd_sample <= '0';
             o_rst <= '0';
+            r_err_clear <= '0';
 
             if i_rst_n = '0' then
-                o_regmap <= c_regmap_default;
+                io_regmap <= c_regmap_default;
             elsif r_sample_rolled = '1' and is_write(r_reg_raw) then
                 reg := parse_reg(r_reg_raw);
 
@@ -198,8 +213,11 @@ begin
                     when REG_RESET =>
                         o_rst <= '1';
 
+                    when REG_STATUS =>
+                        r_err_clear <= '1';
+
                     when REG_SHDIV1 | REG_SHDIV2 | REG_SHDIV3 =>
-                        set_reg(o_regmap, reg, r_in_buf);
+                        set_reg(io_regmap, reg, r_in_buf);
 
                     when others => null;
                 end case;

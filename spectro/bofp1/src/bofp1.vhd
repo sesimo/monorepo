@@ -49,9 +49,9 @@ architecture structural of bofp1 is
 
     signal r_fifo_rd: std_logic;
     signal r_fifo_data: std_logic_vector(15 downto 0);
-    signal r_fifo_empty: std_logic;
 
     signal r_regmap: t_regmap;
+    signal r_errors: t_err_bitmap;
 begin
     r_rst_n <= not r_rst;
     r_rst <= '1' when r_rst_gen = '1' or i_rst_n = '0' else '0';
@@ -97,16 +97,16 @@ begin
             o_data_rdy => r_cap_rdy
         );
 
-    u_fifo_data: fifo_data
-        port map (
-            rst => r_rst,
-            clk => r_clk_main,
-            wr_en => r_cap_rdy,
-            din => r_cap_data,
-            rd_en => r_fifo_rd,
-            dout => r_fifo_data,
-            empty => r_fifo_empty,
-            prog_full => o_fifo_wmark
+    u_fifo: entity work.frame_fifo
+        port map(
+            i_clk => r_clk_main,
+            i_rst_n => r_rst_n,
+            i_wr => r_cap_rdy,
+            i_data => r_cap_data,
+            i_rd => r_fifo_rd,
+            o_data => r_fifo_data,
+            o_watermark => o_fifo_wmark,
+            o_errors => r_errors
         );
 
     u_ctrl: entity work.ctrl(behaviour)
@@ -121,11 +121,11 @@ begin
             i_mosi => i_spi_sub_mosi,
             o_miso => o_spi_sub_miso,
 
-            i_fifo_empty => r_fifo_empty,
             i_fifo_data => r_fifo_data,
             o_fifo_rd => r_fifo_rd,
 
-            o_regmap => r_regmap
+            i_errors => r_errors,
+            io_regmap => r_regmap
         );
 
 end architecture structural;

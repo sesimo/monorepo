@@ -42,7 +42,7 @@ architecture bhv of tb_bofp1 is
     constant c_scope: string := C_TB_SCOPE_DEFAULT;
 
     constant c_reg_stream: std_logic_vector(15 downto 0) := x"0000";
-    constant c_reg_sample: std_logic_vector(15 downto 0) := x"9" & x"000";
+    constant c_reg_sample: std_logic_vector(15 downto 0) := x"8100";
 
     constant c_clk_period: time := (1.0 / real(G_CLK_FREQ)) * (1 sec);
     constant c_sclk_period: time := c_clk_period * G_SCLK_DIV;
@@ -347,21 +347,21 @@ begin
         end loop;
         
         spi_master_transmit(
-            x"b0f3",
+            x"83f3",
             "Update pscdiv",
             r_spi_sub_if,
             config => r_spi_conf
         );
         
         spi_master_transmit(
-            x"c034",
+            x"8434",
             "Update shdiv",
             r_spi_sub_if,
             config => r_spi_conf
         );
 
         spi_master_transmit(
-            x"a000",
+            x"8200",
             "Reset",
             r_spi_sub_if,
             config => r_spi_conf

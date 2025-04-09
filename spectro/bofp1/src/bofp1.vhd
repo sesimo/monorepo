@@ -79,7 +79,7 @@ begin
             i_clk => r_clk_main,
             i_rst_n => r_rst_n,
             i_start => r_cap_start,
-            i_sh_div => r_regmap.shdiv1 & r_regmap.shdiv2 & r_regmap.shdiv3,
+            i_regmap => r_regmap,
 
             i_adc_eoc => i_adc_eoc,
             i_adc_sclk2 => r_adc_sclk2,

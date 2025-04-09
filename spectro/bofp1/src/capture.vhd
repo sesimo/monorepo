@@ -3,12 +3,14 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
+use work.ctrl_common.all;
+
 entity capture is
     port (
         i_clk: in std_logic;
         i_rst_n: in std_logic;
         i_start: in std_logic;
-        i_sh_div: in std_logic_vector(23 downto 0);
+        i_regmap: in t_regmap;
 
         i_adc_eoc: in std_logic;
         o_adc_stconv: out std_logic;
@@ -43,7 +45,9 @@ begin
             i_clk => i_clk,
             i_rst_n => i_rst_n,
             i_start => r_ccd_start,
-            i_sh_div => i_sh_div,
+            i_sh_div => get_reg(i_regmap, REG_SHDIV1) &
+                        get_reg(i_regmap, REG_SHDIV2) &
+                        get_reg(i_regmap, REG_SHDIV3),
             
             i_adc_eoc => i_adc_eoc,
             o_adc_stconv => o_adc_stconv,

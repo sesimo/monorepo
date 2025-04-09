@@ -32,11 +32,27 @@ package ctrl_common is
     -- return t_reg_vector Read register value
     function get_reg(regmap: t_regmap; reg: t_reg) return t_reg_vector;
 
+    -- brief Set register
+    -- param regmap Register map to write to
+    -- param reg Register to write to
+    -- param val Value to write
     procedure set_reg(signal regmap: out t_regmap;
-                      constant reg: t_reg; signal val: in t_reg_vector);
+                      constant reg: in t_reg;
+                      constant val: in t_reg_vector);
 
+    -- brief Parse register represented in `code`
+    -- param code Unparsed register
+    -- return t_reg Parsed register
     function parse_reg(code: t_reg_vector) return t_reg;
 
+    -- brief Check if code is a write operation
+    --
+    -- A write operation is indicated by MSB=1
+    --
+    -- param code Command code
+    -- return bool
+    -- retval true Write operation
+    -- retval false Read operation
     function is_write(code: t_reg_vector) return boolean;
 end package ctrl_common;
 
@@ -47,7 +63,8 @@ package body ctrl_common is
     end function get_reg;
 
     procedure set_reg(signal regmap: out t_regmap;
-                      constant reg: t_reg; signal val: in t_reg_vector) is
+                      constant reg: in t_reg;
+                      constant val: in t_reg_vector) is
     begin
         regmap(t_reg'pos(reg)) <= val;
     end procedure set_reg;

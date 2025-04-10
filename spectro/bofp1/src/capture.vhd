@@ -33,13 +33,19 @@ architecture behaviour of capture is
     signal r_ccd_rdy: std_logic;
     signal r_ccd_busy: std_logic;
     signal r_ccd_start: std_logic;
-    signal r_ccd_data: std_logic_vector(15 downto 0);
+    signal r_ccd_data: std_logic_vector(o_data'range);
+
+    signal r_moving_avg_rdy: std_logic;
+    signal r_moving_avg_data: std_logic_vector(o_data'range);
+
+    constant c_num_elements: integer := 3648;
 begin
     r_ccd_start <= i_start;
 
     u_ccd: entity work.tcd1304(rtl)
         generic map(
-            G_CLK_FREQ => 100_000_000
+            G_CLK_FREQ => 100_000_000,
+            G_NUM_ELEMENTS => c_num_elements
         )
         port map(
             i_clk => i_clk,
@@ -63,6 +69,20 @@ begin
             o_ccd_busy => r_ccd_busy,
             o_data_rdy => r_ccd_rdy,
             o_data => r_ccd_data
+        );
+
+    u_moving_avg: entity work.avg_moving
+        generic map (
+            C_NUM_ELEMENTS => c_num_elements
+        )
+        port map(
+            i_clk => i_clk,
+            i_rst_n => i_rst_n,
+            i_n => get_reg(i_regmap, REG_MOVING_AVG_N),
+            i_rdy => r_ccd_rdy,
+            i_data => r_ccd_data,
+            o_rdy => r_moving_avg_rdy,
+            o_data => r_moving_avg_data
         );
 
     o_ccd_busy <= r_ccd_busy;

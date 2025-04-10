@@ -22,10 +22,13 @@ SOURCES=\
 	src/spi/spi_sub.vhd  \
 	src/adc.vhd  \
 	src/ccd.vhd  \
-	src/capture.vhd \
 	src/ctrl/ctrl_common_pkg.vhd \
 	src/ctrl/ctrl_err.vhd \
 	src/ctrl/ctrl.vhd \
+	src/window_fifo.vhd \
+	src/avg_moving.vhd \
+	src/capture.vhd \
+	src/frame_fifo.vhd \
 	src/bofp1.vhd
 
 GHDL_ARGS=--workdir=$(realpath build) --std=08 -frelaxed-rules \

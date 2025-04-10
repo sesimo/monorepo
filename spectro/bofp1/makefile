@@ -8,6 +8,9 @@ SOURCES=\
 	platform/uvvm/fifo_common.vhd \
 	platform/uvvm/fifo_data.vhd \
 	platform/uvvm/fifo_ctrl.vhd \
+	platform/uvvm/fifo_window_256.vhd \
+	platform/uvvm/fifo_window_64.vhd \
+	src/vivado_pkg.vhd \
 	src/util/utils_pkg.vhd  \
 	src/util/counter.vhd  \
 	src/util/enable.vhd   \

@@ -24,6 +24,7 @@ SOURCES=\
 	src/ccd.vhd  \
 	src/capture.vhd \
 	src/ctrl/ctrl_common_pkg.vhd \
+	src/ctrl/ctrl_err.vhd \
 	src/ctrl/ctrl.vhd \
 	src/bofp1.vhd
 

@@ -181,7 +181,9 @@ int bofp1_enable_read(const struct device *dev)
         status = gpio_pin_interrupt_configure_dt(&cfg->fifo_w_gpios,
                                                  GPIO_INT_EDGE_TO_ACTIVE);
 
-        k_work_reschedule(&data->watchdog_work, BOFP1_TIMEOUT);
+        k_work_reschedule(
+                &data->watchdog_work,
+                K_NSEC(bofp1_integration_time(dev, data->shdiv) + 1000000));
 
         return status;
 }

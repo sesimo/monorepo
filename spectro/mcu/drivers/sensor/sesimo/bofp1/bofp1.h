@@ -28,8 +28,6 @@
 
 #define BOFP1_BUSY (0) /* Sensor busy */
 
-#define BOFP1_TIMEOUT    (K_MSEC(10))
-
 struct bofp1_cfg {
         uint8_t psc;
         uint8_t clkdiv;

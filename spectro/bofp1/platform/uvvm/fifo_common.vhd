@@ -14,7 +14,8 @@ entity fifo_common is
     generic (
         G_DATA_WIDTH: integer := 16;
         G_PROG_FULL: integer := 1;
-        G_SIZE: integer
+        G_SIZE: integer;
+        C_FWT: boolean := true
     );
     port (
         rst: in std_logic;

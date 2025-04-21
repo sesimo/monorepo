@@ -13,6 +13,7 @@ package ctrl_common is
         REG_SHDIV3,
         REG_PRC_CONTROL, -- Processing control
         REG_MOVING_AVG_N,
+        REG_TOTAL_AVG_N,
         REG_STATUS
     );
     constant t_reg_len: integer := t_reg'pos(t_reg'high) + 1;
@@ -25,6 +26,7 @@ package ctrl_common is
         t_reg'pos(REG_SHDIV2) => std_logic_vector(to_unsigned(0, 8)),
         t_reg'pos(REG_SHDIV3) => std_logic_vector(to_unsigned(80, 8)),
         t_reg'pos(REG_MOVING_AVG_N) => std_logic_vector(to_unsigned(1, 8)),
+        t_reg'pos(REG_TOTAL_AVG_N) => std_logic_vector(to_unsigned(2, 8)),
         others => (others => '0')
     );
     

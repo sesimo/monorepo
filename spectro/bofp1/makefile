@@ -10,6 +10,9 @@ SOURCES=\
 	platform/uvvm/fifo_ctrl.vhd \
 	platform/uvvm/fifo_window_256.vhd \
 	platform/uvvm/fifo_window_64.vhd \
+	platform/uvvm/frame_bram.vhd \
+	platform/uvvm/frame_bram_16b.vhd \
+	platform/uvvm/frame_bram_21b.vhd \
 	src/vivado_pkg.vhd \
 	src/util/utils_pkg.vhd  \
 	src/util/counter.vhd  \
@@ -25,8 +28,10 @@ SOURCES=\
 	src/ctrl/ctrl_common_pkg.vhd \
 	src/ctrl/ctrl_err.vhd \
 	src/ctrl/ctrl.vhd \
+	src/frame_ram.vhd \
 	src/window_fifo.vhd \
 	src/avg_moving.vhd \
+	src/avg_total.vhd \
 	src/capture.vhd \
 	src/frame_fifo.vhd \
 	src/bofp1.vhd

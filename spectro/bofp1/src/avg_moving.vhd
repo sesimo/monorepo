@@ -6,24 +6,20 @@ use ieee.numeric_std.all;
 use work.utils.all;
 
 entity avg_moving is
-    generic (
-        C_NUM_ELEMENTS: integer
-    );
     port (
         i_clk: in std_logic;
         i_rst_n: in std_logic;
+        i_en: in std_logic;
         i_rdy: in std_logic;
         i_n: in std_logic_vector(7 downto 0);
         i_data: in std_logic_vector(15 downto 0);
+        o_busy: out std_logic;
         o_rdy: out std_logic;
         o_data: out std_logic_vector(15 downto 0)
     );
 end entity avg_moving;
 
 architecture behaviour of avg_moving is
-    signal r_cnt: std_logic_vector(bits_needed(C_NUM_ELEMENTS)-1 downto 0);
-    signal r_cnt_rolled: std_logic;
-
     type t_state is (S_START, S_NORMAL);
     signal r_state: t_state;
 
@@ -38,6 +34,10 @@ architecture behaviour of avg_moving is
     signal r_fifo_pop: std_logic;
 
     signal r_n_total: unsigned(9 downto 0);
+    signal r_cnt: std_logic_vector(r_n_total'range);
+    signal r_cnt_rolled: std_logic;
+    signal r_cnt_rst_n: std_logic;
+
 begin
 
     u_fifo: entity work.window_fifo
@@ -53,15 +53,19 @@ begin
             o_data => r_last
         );
 
+    r_cnt_rst_n <= '0' when (i_rst_n = '0' or i_en = '0') else '1';
+
+    -- Only need to count up to the first N elements, which will trigger a
+    -- a state change. Rollovers after that are ignored.
     u_cnt: entity work.counter
         generic map (
-            G_WIDTH => bits_needed(C_NUM_ELEMENTS)
+            G_WIDTH => r_n_total'length
         )
         port map (
             i_clk => i_clk,
-            i_rst_n => i_rst_n,
+            i_rst_n => r_cnt_rst_n,
             i_en => i_rdy,
-            i_max => std_logic_vector(to_unsigned(C_NUM_ELEMENTS, r_cnt'length)),
+            i_max => std_logic_vector(r_n_total),
             o_cnt => r_cnt,
             o_roll => r_cnt_rolled
         );
@@ -148,20 +152,27 @@ begin
         end if;
     end process p_rdy;
 
+    p_busy: process(i_clk)
+    begin
+        if rising_edge(i_clk) then
+            o_busy <= i_en;
+        end if;
+    end process p_busy;
+
     p_state: process(i_clk)
     begin
         if rising_edge(i_clk) then
             if i_rst_n = '0' then
                 r_state <= S_START;
-            elsif i_rdy = '1' then
+            else
                 case r_state is
                     when S_START =>
-                        if unsigned(r_cnt) >= r_n_total-1 then
+                        if r_cnt_rolled = '1' then
                             r_state <= S_NORMAL;
                         end if;
 
                     when S_NORMAL =>
-                        if r_cnt_rolled = '1' then
+                        if i_en = '0' then
                             r_state <= S_START;
                         end if;
 

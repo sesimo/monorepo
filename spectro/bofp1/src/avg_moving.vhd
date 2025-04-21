@@ -93,7 +93,7 @@ begin
         if rising_edge(i_clk) then
             r_fifo_rd <= '0';
 
-            if r_state = S_NORMAL and r_fifo_pop = '1' then
+            if (r_state = S_NORMAL or r_cnt_rolled = '1') and r_fifo_pop = '1' then
                 r_fifo_rd <= '1';
             end if;
         end if;

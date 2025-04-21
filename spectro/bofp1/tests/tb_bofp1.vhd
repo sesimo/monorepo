@@ -57,6 +57,14 @@ architecture bhv of tb_bofp1 is
         end if;
     end procedure wait_rst;
 
+    procedure calc_ccd_val(variable val: out integer;
+                       variable clk_count: inout integer;
+                       variable noise_count: inout integer) is
+    begin
+        val := clk_count + noise_count;
+        clk_count := (clk_count + 1) mod c_ccd_pix_count;
+        noise_count := (noise_count + 1) mod 10;
+    end procedure calc_ccd_val;
 begin
     clock_generator(r_clk, r_clkena, c_clk_period, "OSC Main");
 
@@ -102,18 +110,25 @@ begin
         -- Emulate readout values
         p_ccd_data: process(r_ccd_mclk)
             variable mclk_count: integer range 0 to 3 := 0;
-            variable data_cycles: integer range 0 to 3694 := 0;
+
+            variable data_cycles: integer range 0 to c_ccd_pix_count := 0;
+            variable noise_count: integer range 0 to 10 := 0;
+            variable val: integer := 0;
         begin
             if rising_edge(r_ccd_mclk) then
                 if r_ccd_running then
-                    mclk_count := (mclk_count + 1) mod 4;
-
                     if mclk_count = 0 then
-                        r_dummy_val <= (r_dummy_val + 1) mod c_ccd_pix_count;
-                        data_cycles := (data_cycles + 1) mod 3694;
+                        calc_ccd_val(val, data_cycles, noise_count);
 
+                        r_dummy_val <= to_unsigned(val, r_dummy_val'length);
                         r_ccd_done <= data_cycles = 0;
                     end if;
+
+                    mclk_count := (mclk_count + 1) mod 4;
+                else
+                    r_dummy_val <= (others => '0');
+                    noise_count := 0;
+                    mclk_count := 0;
                 end if;
             end if;
         end process p_ccd_data;
@@ -232,22 +247,26 @@ begin
     end block b_emul;
 
     p_main: process
+        variable ccd_cycles: integer := 0;
+        variable ccd_noise: integer := 0;
+        variable ccd_val: integer;
+
         -- Check the readings from one stream (16 values)
         procedure check_adc_readings(count: integer; offset: integer;
                                      data: std_logic_vector) is
             variable head: integer;
-            variable value: integer;
+            variable idx: integer;
         begin
             for i in 0 to count-1 loop
                 head := data'high - i*16;
-                value := offset + i;
+                idx := offset + i;
 
-                report "Value " & integer'image(value);
+                calc_ccd_val(ccd_val, ccd_cycles, ccd_noise);
 
                 check_value(
                     data(head downto head-15),
-                    std_logic_vector(to_unsigned(value, 16)),
-                    "Check ADC reading: " & integer'image(value)
+                    std_logic_vector(to_unsigned(ccd_val, 16)),
+                    "Check ADC reading: " & integer'image(idx)
                 );
             end loop;
         end procedure check_adc_readings;
@@ -309,8 +328,9 @@ begin
                 wait for 1 ps;
             end loop;
 
+            ccd_cycles := 0;
+            ccd_noise := 0;
             wait for 1 ps;
-
         end procedure check_frame;
     begin
         report_global_ctrl(VOID);

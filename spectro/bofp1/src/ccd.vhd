@@ -31,7 +31,7 @@ entity tcd1304 is
         o_pin_icg: out std_logic;
         o_pin_mclk: out std_logic;
 
-        o_ccd_busy: out std_logic;
+        o_busy: out std_logic;
         o_data_rdy: out std_logic;
         o_data: out std_logic_vector(15 downto 0)
     );
@@ -238,7 +238,7 @@ begin
 
     r_data_read <= r_data_enable when r_state = S_CAPTURE else '0';
     r_icg_buf <= '1' when r_state = S_ICG else '0';
-    o_ccd_busy <= '0' when r_state = S_IDLE else '1';
+    o_busy <= '0' when r_state = S_IDLE else '1';
     o_pin_icg <= r_icg_buf;
     o_pin_mclk <= r_mclk_buf;
     o_pin_sh <= r_sh_delayed;

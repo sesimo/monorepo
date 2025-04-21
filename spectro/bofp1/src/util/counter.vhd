@@ -22,6 +22,11 @@ end entity counter;
 
 architecture rtl of counter is
     signal r_cnt: unsigned(G_WIDTH-1 downto 0);
+
+    function is_zero(data: std_logic_vector) return boolean is
+    begin
+        return data = (data'range => '0');
+    end function is_zero;
 begin
 
     p_count: process(i_clk)
@@ -31,6 +36,8 @@ begin
 
             if i_rst_n = '0' then
                 r_cnt <= (others => '0');
+            elsif is_zero(i_max) then
+                o_roll <= '1';
             elsif i_en = '1' then
                 r_cnt <= r_cnt + 1;
 

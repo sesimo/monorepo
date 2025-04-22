@@ -41,8 +41,12 @@ architecture bhv of tb_bofp1 is
 
     constant c_scope: string := C_TB_SCOPE_DEFAULT;
 
-    constant c_reg_stream: std_logic_vector(15 downto 0) := x"0000";
-    constant c_reg_sample: std_logic_vector(15 downto 0) := x"8100";
+    constant c_reg_stream_raw: std_logic_vector(15 downto 0) := x"0000";
+    constant c_reg_stream_pl: std_logic_vector(15 downto 0) := x"0100";
+    constant c_reg_sample: std_logic_vector(15 downto 0) := x"8200";
+    constant c_reg_reset: std_logic_vector(15 downto 0) := x"8300";
+    constant c_reg_pscdiv: std_logic_vector(7 downto 0) := x"84";
+    constant c_reg_shdiv: std_logic_vector(7 downto 0) := x"85";
 
     constant c_clk_period: time := (1.0 / real(G_CLK_FREQ)) * (1 sec);
     constant c_sclk_period: time := c_clk_period * G_SCLK_DIV;
@@ -287,7 +291,7 @@ begin
             variable tx_data: std_logic_vector(rx_data'range) := (others => '0');
         begin
             -- Prepare stream command
-            tx_data(tx_data'high downto tx_data'high-15) := c_reg_stream;
+            tx_data(tx_data'high downto tx_data'high-15) := c_reg_stream_raw;
 
             spi_master_transmit_and_receive(
                 tx_data, rx_data, "FIFO stream", r_spi_sub_if,
@@ -341,6 +345,7 @@ begin
         ------------------------------------------------------------------------
         r_rst_n <= '0';
 
+        -- Setup SPI
         r_spi_conf.CPOL <= '0';
         r_spi_conf.CPHA <= '1';
         r_spi_conf.spi_bit_time <= c_sclk_period;
@@ -367,21 +372,21 @@ begin
         end loop;
         
         spi_master_transmit(
-            x"83f3",
+            std_logic_vector'(c_reg_pscdiv & x"f3"),
             "Update pscdiv",
             r_spi_sub_if,
             config => r_spi_conf
         );
         
         spi_master_transmit(
-            x"8434",
+            std_logic_vector'(c_reg_shdiv & x"34"),
             "Update shdiv",
             r_spi_sub_if,
             config => r_spi_conf
         );
 
         spi_master_transmit(
-            x"8200",
+            c_reg_reset,
             "Reset",
             r_spi_sub_if,
             config => r_spi_conf

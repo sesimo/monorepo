@@ -26,11 +26,10 @@ entity capture is
         i_fifo_raw_rd: in std_logic;
         i_fifo_pl_rd: in std_logic;
         o_fifo_raw_data: out std_logic_vector(15 downto 0);
-        o_fifo_raw_wmark: out std_logic;
         o_fifo_pl_data: out std_logic_vector(15 downto 0);
-        o_fifo_pl_wmark: out std_logic;
 
         o_busy: out std_logic;
+        o_fifo_wmark: out std_logic;
 
         o_errors: out t_err_bitmap
     );
@@ -48,6 +47,10 @@ architecture behaviour of capture is
 
     signal r_moving_avg_rdy: std_logic;
     signal r_moving_avg_data: std_logic_vector(r_ccd_data'range);
+    signal r_moving_avg_busy: std_logic;
+
+    signal r_fifo_pl_wmark: std_logic;
+    signal r_fifo_raw_wmark: std_logic;
 
     constant c_num_elements: integer := 364;
 begin
@@ -94,7 +97,7 @@ begin
             i_data => r_ccd_data,
             i_rd => i_fifo_raw_rd,
             o_data => o_fifo_raw_data,
-            o_watermark => o_fifo_raw_wmark,
+            o_watermark => r_fifo_raw_wmark,
             o_errors => o_errors
         );
 
@@ -119,6 +122,7 @@ begin
             i_en => r_total_avg_busy,
             i_rdy => r_total_avg_rdy,
             i_data => r_total_avg_data,
+            o_busy => r_moving_avg_busy,
             o_rdy => r_moving_avg_rdy,
             o_data => r_moving_avg_data
         );
@@ -135,10 +139,26 @@ begin
             i_data => r_moving_avg_data,
             i_rd => i_fifo_pl_rd,
             o_data => o_fifo_pl_data,
-            o_watermark => o_fifo_pl_wmark,
+            o_watermark => r_fifo_pl_wmark,
             o_errors => o_errors
         );
 
-    o_busy <= r_ccd_busy;
+    p_fifo_wmark: process(all)
+    begin
+        if get_prc(i_regmap, PRC_WMARK_SRC) = '1' then
+            o_fifo_wmark <= r_fifo_pl_wmark;
+        else
+            o_fifo_wmark <= r_fifo_raw_wmark;
+        end if;
+    end process p_fifo_wmark;
+
+    p_busy: process(all)
+    begin
+        if get_prc(i_regmap, PRC_BUSY_SRC) = '1' then
+            o_busy <= r_moving_avg_busy;
+        else
+            o_busy <= r_ccd_busy;
+        end if;
+    end process p_busy;
 
 end architecture behaviour;

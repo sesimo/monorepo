@@ -20,12 +20,8 @@ entity ctrl is
 
         i_fifo_raw_data: in std_logic_vector(15 downto 0);
         i_fifo_pl_data: in std_logic_vector(15 downto 0);
-        i_fifo_raw_wmark: in std_logic;
-        i_fifo_pl_wmark: in std_logic;
         o_fifo_raw_rd: out std_logic;
         o_fifo_pl_rd: out std_logic;
-
-        o_fifo_wmark: out std_logic;
 
         i_errors: in t_err_bitmap;
         io_regmap: inout t_regmap
@@ -222,15 +218,6 @@ begin
             end if;
         end if;
     end process p_stream;
-
-    p_fifo_wmark: process(all)
-    begin
-        if get_prc(io_regmap, PRC_WMARK_SRC) = '1' then
-            o_fifo_wmark <= i_fifo_pl_wmark;
-        else
-            o_fifo_wmark <= i_fifo_raw_wmark;
-        end if;
-    end process p_fifo_wmark;
 
     -- Read registere value
     p_read: process(i_clk)

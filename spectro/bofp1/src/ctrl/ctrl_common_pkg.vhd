@@ -20,7 +20,8 @@ package ctrl_common is
     constant t_reg_len: integer := t_reg'pos(t_reg'high) + 1;
 
     type t_prc_ctrl is (
-        PRC_WMARK_SRC
+        PRC_WMARK_SRC,
+        PRC_BUSY_SRC
     );
 
     subtype t_reg_vector is std_logic_vector(7 downto 0);

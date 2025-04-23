@@ -43,8 +43,6 @@ architecture structural of bofp1 is
     
     signal r_fifo_pl_rd: std_logic;
     signal r_fifo_raw_rd: std_logic;
-    signal r_fifo_pl_wmark: std_logic;
-    signal r_fifo_raw_wmark: std_logic;
     signal r_fifo_pl_data: std_logic_vector(15 downto 0);
     signal r_fifo_raw_data: std_logic_vector(15 downto 0);
 
@@ -97,11 +95,10 @@ begin
 
             i_fifo_pl_rd => r_fifo_pl_rd,
             i_fifo_raw_rd => r_fifo_raw_rd,
-            o_fifo_pl_wmark => r_fifo_pl_wmark,
-            o_fifo_raw_wmark => r_fifo_raw_wmark,
             o_fifo_pl_data => r_fifo_pl_data,
             o_fifo_raw_data => r_fifo_raw_data,
 
+            o_fifo_wmark => o_fifo_wmark,
             o_errors => r_errors
         );
 
@@ -119,12 +116,8 @@ begin
 
             i_fifo_pl_data => r_fifo_pl_data,
             i_fifo_raw_data => r_fifo_raw_data,
-            i_fifo_pl_wmark => r_fifo_pl_wmark,
-            i_fifo_raw_wmark => r_fifo_raw_wmark,
             o_fifo_pl_rd => r_fifo_pl_rd,
             o_fifo_raw_rd => r_fifo_raw_rd,
-
-            o_fifo_wmark => o_fifo_wmark,
 
             i_errors => r_errors,
             io_regmap => r_regmap

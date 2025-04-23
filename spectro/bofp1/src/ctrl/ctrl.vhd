@@ -271,7 +271,8 @@ begin
                         r_err_clear <= '1';
 
                     when REG_SHDIV1 | REG_SHDIV2 | REG_SHDIV3
-                         | REG_PRC_CONTROL =>
+                         | REG_PRC_CONTROL | REG_TOTAL_AVG_N
+                         | REG_MOVING_AVG_N =>
                         set_reg(io_regmap, reg, r_in_buf);
 
                     when others => null;

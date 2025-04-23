@@ -115,10 +115,9 @@ static void bofp1_rtio_err(struct rtio *r, const struct rtio_sqe *sqe,
         ARG_UNUSED(sqe);
 
         uint8_t reg_reset[2];
-        uint8_t reg_conf[4];
+        uint8_t reg_conf[6];
         const struct device *dev = dev_arg;
         struct bofp1_data *data = dev->data;
-        const struct bofp1_cfg *cfg = dev->config;
         struct rtio_sqe *reset;
         struct rtio_sqe *conf;
         struct rtio_sqe *finish;
@@ -135,10 +134,12 @@ static void bofp1_rtio_err(struct rtio *r, const struct rtio_sqe *sqe,
          * packets will be more than enough. */
         reg_reset[0] = BOFP1_WRITE_REG(BOFP1_REG_RESET); /* Reset */
         reg_reset[1] = 0;
-        reg_conf[0] = BOFP1_WRITE_REG(BOFP1_REG_PSCDIV); /* Set prescaler */
-        reg_conf[1] = cfg->psc;
-        reg_conf[2] = BOFP1_WRITE_REG(BOFP1_REG_CCD_SH); /* Set SH div */
-        reg_conf[3] = data->shdiv;
+        reg_conf[0] = BOFP1_WRITE_REG(BOFP1_REG_CCD_SH1); /* Set SH div */
+        reg_conf[1] = data->shdiv[0];
+        reg_conf[2] = BOFP1_WRITE_REG(BOFP1_REG_CCD_SH2); /* Set SH div */
+        reg_conf[3] = data->shdiv[1];
+        reg_conf[4] = BOFP1_WRITE_REG(BOFP1_REG_CCD_SH3); /* Set SH div */
+        reg_conf[5] = data->shdiv[2];
         rtio_sqe_prep_tiny_write(reset, data->iodev_bus, RTIO_PRIO_NORM,
                                  reg_reset, sizeof(reg_reset), NULL);
         rtio_sqe_prep_tiny_write(conf, data->iodev_bus, RTIO_PRIO_NORM,

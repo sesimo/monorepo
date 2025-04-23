@@ -5,13 +5,6 @@ compatible: sesimo,bofp1
 description: Device driver for the SESIMO FPGA CCD Sensor bridge (BOFP1)
 
 properties:
-  prescaler:
-    type: int
-    default: 0
-    description: |
-      Prescaler for the timing parameters used on the FPGA. Timing parameters
-      are calculated as `CLK/((PSC + 1) * DIV)`
-
   clock-frequency:
     type: int
     default: 100000000

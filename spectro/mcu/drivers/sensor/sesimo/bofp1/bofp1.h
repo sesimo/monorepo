@@ -12,11 +12,12 @@
 #define BOFP1_READ_REG(r)  (r << BOFP1_REG_OFFSET)
 #define BOFP1_WRITE_REG(r) ((r << BOFP1_REG_OFFSET) | BOFP1_REG_BIT_WR)
 
-#define BOFP1_REG_STREAM (0x0) /* Stream for entirety of transmission */
-#define BOFP1_REG_SAMPLE (0x1) /* Begin sample. Write only */
-#define BOFP1_REG_RESET  (0x2) /* Reset */
-#define BOFP1_REG_PSCDIV (0x3) /* Prescaler */
-#define BOFP1_REG_CCD_SH (0x4) /* Shutter frequncy (clock div)  */
+#define BOFP1_REG_STREAM  (0x0) /* Stream for entirety of transmission */
+#define BOFP1_REG_SAMPLE  (0x1) /* Begin sample. Write only */
+#define BOFP1_REG_RESET   (0x2) /* Reset */
+#define BOFP1_REG_CCD_SH1 (0x3) /* 24bit SH frequncy (clock div) MSB byte 0 */
+#define BOFP1_REG_CCD_SH2 (0x4) /* 24bit SH frequncy (clock div) MSB byte 1 */
+#define BOFP1_REG_CCD_SH3 (0x5) /* 24bit SH frequncy (clock div) MSB byte 2 */
 
 #define BOFP1_NUM_ELEMENTS_REAL        (3648)
 #define BOFP1_NUM_ELEMENTS_DUMMY_LEFT  (32)
@@ -29,7 +30,6 @@
 #define BOFP1_BUSY (0) /* Sensor busy */
 
 struct bofp1_cfg {
-        uint8_t psc;
         uint8_t clkdiv;
         uint32_t integration_time_dt;
         uint32_t clock_frequency;
@@ -40,7 +40,7 @@ struct bofp1_cfg {
 };
 
 struct bofp1_data {
-        uint8_t shdiv;
+        uint8_t shdiv[3];
 
         struct gpio_callback busy_fall_cb;
         struct gpio_callback fifo_w_cb;

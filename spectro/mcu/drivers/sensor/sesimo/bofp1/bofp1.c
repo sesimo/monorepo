@@ -4,6 +4,7 @@
 #include <zephyr/drivers/spi.h>
 #include <zephyr/logging/log.h>
 #include <zephyr/drivers/gpio.h>
+#include <zephyr/sys/byteorder.h>
 
 #include <drivers/sensor/bofp1.h>
 
@@ -70,35 +71,26 @@ static uint32_t bofp1_mclk_freq(const struct device *dev)
         return cfg->clock_frequency / cfg->clkdiv;
 }
 
-static uint32_t bofp1_psc_freq(const struct device *dev)
+static uint32_t bofp1_sh_div(const struct device *dev, uint32_t freq)
 {
-        const struct bofp1_cfg *cfg = dev->config;
-
-        return bofp1_mclk_freq(dev) / (cfg->psc + 1);
+        return (bofp1_mclk_freq(dev) / freq) - 1;
 }
 
-static int bofp1_set_psc(const struct device *dev)
+static uint32_t bofp1_integration_time(const struct device *dev)
 {
-        const struct bofp1_cfg *cfg = dev->config;
+        struct bofp1_data *data = dev->data;
+        uint32_t div;
 
-        return bofp1_write_reg(dev, BOFP1_REG_PSCDIV, cfg->psc);
-}
+        div = sys_get_be24(data->shdiv);
 
-static uint8_t bofp1_sh_div(const struct device *dev, uint32_t freq)
-{
-        return (bofp1_psc_freq(dev) / freq) - 1;
-}
-
-static uint32_t bofp1_integration_time(const struct device *dev, uint8_t div)
-{
-        return 1000000000UL / (bofp1_psc_freq(dev) / (div + 1));
+        return 1000000000UL / (bofp1_mclk_freq(dev) / (div + 1));
 }
 
 static int bofp1_set_integration_time(const struct device *dev,
                                       uint32_t time_ns)
 {
         uint32_t freq;
-        uint8_t div;
+        uint32_t div;
         int status;
         struct bofp1_data *data = dev->data;
         k_spinlock_key_t key;
@@ -106,22 +98,30 @@ static int bofp1_set_integration_time(const struct device *dev,
         key = k_spin_lock(&data->lock);
 
         freq = 1000000000UL / time_ns;
-        if (freq > bofp1_psc_freq(dev)) {
-                LOG_ERR("Integration time frequency must be lower than "
-                        "prescaled frequency. Consider adjusting the "
-                        "prescaler");
+
+        div = bofp1_sh_div(dev, freq);
+        if (div > (1 << 24) - 1) {
+                LOG_ERR("Integration time %" PRIu32 " is too high.", time_ns);
                 status = -EINVAL;
                 goto exit;
         }
 
-        div = bofp1_sh_div(dev, freq);
+        sys_put_be24(div, data->shdiv);
 
-        status = bofp1_write_reg(dev, BOFP1_REG_CCD_SH, div);
+        status = bofp1_write_reg(dev, BOFP1_REG_CCD_SH1, data->shdiv[0]);
         if (status != 0) {
                 goto exit;
         }
 
-        data->shdiv = div;
+        status = bofp1_write_reg(dev, BOFP1_REG_CCD_SH2, data->shdiv[1]);
+        if (status != 0) {
+                goto exit;
+        }
+
+        status = bofp1_write_reg(dev, BOFP1_REG_CCD_SH3, data->shdiv[2]);
+        if (status != 0) {
+                goto exit;
+        }
 
 exit:
         k_spin_unlock(&data->lock, key);
@@ -137,15 +137,13 @@ static int bofp1_reset(const struct device *dev)
 static int bofp1_attr_get(const struct device *dev, enum sensor_channel chan,
                           enum sensor_attribute attr, struct sensor_value *val)
 {
-        struct bofp1_data *data = dev->data;
-
         if (chan != SENSOR_CHAN_VOLTAGE) {
                 return -EINVAL;
         }
 
         switch (attr) {
         case SENSOR_ATTR_BOFP1_INTEGRATION:
-                val->val1 = bofp1_integration_time(dev, data->shdiv);
+                val->val1 = bofp1_integration_time(dev);
                 break;
         default:
                 return -EINVAL;
@@ -186,9 +184,8 @@ int bofp1_enable_read(const struct device *dev)
          * the integration time, and may not start until after the
          * integration time has passed. It will then use roughly 5ms to
          * collect 1024 samples, which is more than what we need. */
-        k_work_reschedule(
-                &data->watchdog_work,
-                K_NSEC(bofp1_integration_time(dev, data->shdiv) + 5000000));
+        k_work_reschedule(&data->watchdog_work,
+                          K_NSEC(bofp1_integration_time(dev) + 5000000));
 
         return status;
 }
@@ -343,12 +340,6 @@ static int bofp1_init(const struct device *dev)
                 return status;
         }
 
-        status = bofp1_set_psc(dev);
-        if (status != 0) {
-                LOG_ERR("unable to set prescaler: %i", status);
-                return status;
-        }
-
         status = bofp1_set_integration_time(dev, cfg->integration_time_dt);
         if (status != 0) {
                 LOG_ERR("unable to set integration time: %i", status);
@@ -368,7 +359,6 @@ static int bofp1_init(const struct device *dev)
         static const struct bofp1_cfg bofp1_cfg_##inst_##__ = {                \
                 .bus = SPI_DT_SPEC_INST_GET(inst_, BOFP1_SPI_OP,               \
                                             BOFP1_SPI_DELAY),                  \
-                .psc = DT_INST_PROP(inst_, prescaler),                         \
                 .clkdiv = DT_INST_PROP(inst_, clkdiv),                         \
                 .integration_time_dt = DT_INST_PROP(inst_, integration_time),  \
                 .busy_gpios = GPIO_DT_SPEC_INST_GET(inst_, busy_gpios),        \

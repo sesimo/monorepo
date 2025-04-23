@@ -45,13 +45,26 @@ architecture bhv of tb_bofp1 is
     constant c_reg_stream_pl: std_logic_vector(15 downto 0) := x"0100";
     constant c_reg_sample: std_logic_vector(15 downto 0) := x"8200";
     constant c_reg_reset: std_logic_vector(15 downto 0) := x"8300";
-    constant c_reg_pscdiv: std_logic_vector(7 downto 0) := x"84";
-    constant c_reg_shdiv: std_logic_vector(7 downto 0) := x"85";
+    constant c_reg_shdiv1: std_logic_vector(7 downto 0) := x"84";
+    constant c_reg_shdiv2: std_logic_vector(7 downto 0) := x"85";
+    constant c_reg_shdiv3: std_logic_vector(7 downto 0) := x"86";
+    constant c_reg_prc_ctrl: std_logic_vector(7 downto 0) := x"87";
+    constant c_reg_moving_avg_n: std_logic_vector(7 downto 0) := x"88";
+    constant c_reg_total_avg_n: std_logic_vector(7 downto 0) := x"89";
 
     constant c_clk_period: time := (1.0 / real(G_CLK_FREQ)) * (1 sec);
     constant c_sclk_period: time := c_clk_period * G_SCLK_DIV;
 
-    constant c_ccd_pix_count: integer := 3694;
+    constant c_ccd_pix_count: integer := 364;
+    constant c_dc_base: integer := 4000;
+
+    constant c_total_avg_n: integer := 3;
+    constant c_moving_avg_n: integer := 2;
+    constant c_moving_avg_n_sum: integer := c_moving_avg_n * 2 + 1;
+
+    signal r_frame_count: integer := 0;
+
+    type t_moving_avg_window is array(c_moving_avg_n_sum-1 downto 0) of unsigned(15 downto 0);
 
     -- Wait to leave reset
     procedure wait_rst is
@@ -62,13 +75,43 @@ architecture bhv of tb_bofp1 is
     end procedure wait_rst;
 
     procedure calc_ccd_val(variable val: out integer;
-                       variable clk_count: inout integer;
-                       variable noise_count: inout integer) is
+                           variable clk_count: inout integer;
+                           variable noise_count: inout integer) is
+        variable iter_offset: integer;
     begin
-        val := clk_count + noise_count;
+        -- Add an offset so that it is easy to calculate the average later
+        -- The average should be the same value as the value produced
+        -- when iter_offset=0
+        iter_offset := -integer(floor(real(c_total_avg_n)/2.0)) + r_frame_count;
+
+        val := c_dc_base + iter_offset + clk_count + noise_count;
         clk_count := (clk_count + 1) mod c_ccd_pix_count;
         noise_count := (noise_count + 1) mod 10;
     end procedure calc_ccd_val;
+
+    procedure calc_total_avg_val(variable val: out unsigned;
+                                 variable clk_count: inout integer;
+                                 variable noise_count: inout integer) is
+    begin
+        val := to_unsigned(c_dc_base + clk_count + noise_count, val'length);
+        clk_count := (clk_count + 1) mod c_ccd_pix_count;
+        noise_count := (noise_count + 1) mod 10;
+    end procedure calc_total_avg_val;
+
+    procedure calc_moving_avg_val(variable val: out unsigned;
+                                  variable window: inout t_moving_avg_window;
+                                  variable next_val: in unsigned) is
+        variable sum: unsigned(31 downto 0);
+    begin
+        window := window(window'high-1 downto 0) & next_val;
+        sum := (others => '0');
+
+        for i in 0 to window'high loop
+            sum := sum + window(i);
+        end loop;
+
+        val := resize(sum / window'length, val'length);
+    end procedure calc_moving_avg_val;
 begin
     clock_generator(r_clk, r_clkena, c_clk_period, "OSC Main");
 
@@ -255,6 +298,11 @@ begin
         variable ccd_noise: integer := 0;
         variable ccd_val: integer;
 
+        variable pl_cycles: integer := 0;
+        variable pl_noise: integer := 0;
+        variable pl_val: unsigned(15 downto 0);
+        variable pl_moving_avg_window: t_moving_avg_window;
+
         -- Check the readings from one stream (16 values)
         procedure check_adc_readings(count: integer; offset: integer;
                                      data: std_logic_vector) is
@@ -275,6 +323,41 @@ begin
             end loop;
         end procedure check_adc_readings;
 
+        procedure init_pl_window(variable window: out t_moving_avg_window) is
+            variable ret: t_moving_avg_window;
+            variable val: unsigned(15 downto 0);
+        begin
+            for i in 1 to c_moving_avg_n_sum-1 loop
+                calc_total_avg_val(val, pl_cycles, pl_noise);
+                ret := ret(ret'high-1 downto 0) & val;
+            end loop;
+
+            window := ret;
+        end procedure init_pl_window;
+
+        -- Check the readings from one stream (16 values)
+        procedure check_pl_readings(count: integer; offset: integer;
+                                     data: std_logic_vector) is
+            variable head: integer;
+            variable idx: integer;
+        begin
+            for i in 0 to count-1 loop
+                head := data'high - i*16;
+                idx := offset + i;
+
+                calc_total_avg_val(pl_val, pl_cycles, pl_noise);
+                calc_moving_avg_val(pl_val, pl_moving_avg_window, pl_val);
+
+                if idx < c_ccd_pix_count - c_moving_avg_n_sum then
+                    check_value(
+                        data(head downto head-15),
+                        std_logic_vector(pl_val),
+                        "Check pipeline reading: " & integer'image(idx)
+                    );
+                end if;
+            end loop;
+        end procedure check_pl_readings;
+
         procedure cmd_sample is
         begin
             spi_master_transmit(
@@ -285,7 +368,8 @@ begin
             );
         end procedure cmd_sample;
 
-        procedure check_fifo_read(constant offset: integer;
+        -- Check values read out from the raw FIFO
+        procedure check_fifo_raw_read(constant offset: integer;
                                   constant len: integer) is
             variable rx_data: std_logic_vector(255 downto 0);
             variable tx_data: std_logic_vector(rx_data'range) := (others => '0');
@@ -294,23 +378,95 @@ begin
             tx_data(tx_data'high downto tx_data'high-15) := c_reg_stream_raw;
 
             spi_master_transmit_and_receive(
-                tx_data, rx_data, "FIFO stream", r_spi_sub_if,
+                tx_data, rx_data, "FIFO stream raw", r_spi_sub_if,
                 config => r_spi_conf
             );
 
             check_adc_readings(len, offset, rx_data(rx_data'high-16 downto 0));
-        end procedure check_fifo_read;
+        end procedure check_fifo_raw_read;
 
-        procedure check_frame is
+        -- Check values read out from the pipeline FIFO
+        procedure check_fifo_pl_read(constant offset: integer;
+                                  constant len: integer) is
+            variable rx_data: std_logic_vector(255 downto 0);
+            variable tx_data: std_logic_vector(rx_data'range) := (others => '0');
+        begin
+            -- Prepare stream command
+            tx_data(tx_data'high downto tx_data'high-15) := c_reg_stream_pl;
+
+            spi_master_transmit_and_receive(
+                tx_data, rx_data, "FIFO stream pipeline", r_spi_sub_if,
+                config => r_spi_conf
+            );
+
+            check_pl_readings(len, offset, rx_data(rx_data'high-16 downto 0));
+        end procedure check_fifo_pl_read;
+
+        procedure set_prc_ctrl(constant pl: boolean) is
+            variable tx_data: std_logic_vector(15 downto 0);
+            variable pl_cast: std_logic;
+        begin
+            pl_cast := '1' when pl else '0';
+            tx_data(tx_data'high downto tx_data'high-7) := c_reg_prc_ctrl;
+            tx_data(7 downto 0) := (
+                0 => pl_cast, -- Watermark src
+                1 => pl_cast, -- Busy src
+                others => '0'
+            );
+
+            spi_master_transmit(
+                tx_data,
+                "Set wmark src",
+                r_spi_sub_if,
+                config => r_spi_conf
+            );
+        end procedure set_prc_ctrl;
+
+        procedure set_moving_avg_n(constant n: integer) is
+        begin
+            spi_master_transmit(
+                std_logic_vector'(
+                    c_reg_moving_avg_n & std_logic_vector(to_unsigned(n, 8))),
+                "Set moving avg N",
+                r_spi_sub_if,
+                config => r_spi_conf
+            );
+        end procedure set_moving_avg_n;
+
+        procedure set_total_avg_n(constant n: integer) is
+        begin
+            spi_master_transmit(
+                std_logic_vector'(
+                    c_reg_total_avg_n & std_logic_vector(to_unsigned(n, 8))),
+                "Set total avg N",
+                r_spi_sub_if,
+                config => r_spi_conf
+            );
+        end procedure set_total_avg_n;
+
+        procedure check_frame(constant read_pl: boolean) is
             variable offset: integer := 0;
             variable count: integer;
 
             constant cnt_per_read: integer := 256 / 16 - 1;
+            constant num_iter: integer := c_ccd_pix_count / cnt_per_read;
         begin
-            cmd_sample;
-            wait until r_ccd_busy = '1';
+            -- Set the watermark and busy source. On the last frame readout, the
+            -- watermark source is set to the pipeline FIFO, which comes a
+            -- few cycles after the raw FIFO. This way, both the FIFOs
+            -- can be read out safely at this watermark.
+            set_prc_ctrl(read_pl);
 
-            for i in 0 to c_ccd_pix_count / cnt_per_read loop
+            cmd_sample;
+            if r_ccd_busy /= '1' then
+                wait until r_ccd_busy = '1';
+            end if;
+
+            pl_noise := 0;
+            pl_cycles := 0;
+            init_pl_window(pl_moving_avg_window);
+
+            for i in 0 to num_iter loop
                 if r_ccd_busy = '1' then
                     wait until r_fifo_wmark = '1' or r_ccd_busy = '0';
                 end if;
@@ -318,14 +474,15 @@ begin
                 if offset >= c_ccd_pix_count - cnt_per_read then
                     count := c_ccd_pix_count - offset;
                 else
-                    if r_ccd_busy = '0' then
-                        error("Busy fell before reading all");
-                    end if;
-
                     count := cnt_per_read;
                 end if;
 
-                check_fifo_read(offset, count);
+                check_fifo_raw_read(offset, count);
+
+                if read_pl then
+                    check_fifo_pl_read(offset, count);
+                end if;
+
                 offset := offset + count;
 
                 -- Ensure CS is released between
@@ -367,23 +524,15 @@ begin
         r_rst_n <= '1';
         wait for 1 ps;
 
-        for j in 0 to 1 loop
-            check_frame;
+        set_moving_avg_n(c_moving_avg_n);
+        set_total_avg_n(c_total_avg_n);
+
+        for j in 1 to c_total_avg_n loop
+            check_frame(j = c_total_avg_n);
+
+            r_frame_count <= r_frame_count + 1;
+            wait for 1 ps;
         end loop;
-        
-        spi_master_transmit(
-            std_logic_vector'(c_reg_pscdiv & x"f3"),
-            "Update pscdiv",
-            r_spi_sub_if,
-            config => r_spi_conf
-        );
-        
-        spi_master_transmit(
-            std_logic_vector'(c_reg_shdiv & x"34"),
-            "Update shdiv",
-            r_spi_sub_if,
-            config => r_spi_conf
-        );
 
         spi_master_transmit(
             c_reg_reset,

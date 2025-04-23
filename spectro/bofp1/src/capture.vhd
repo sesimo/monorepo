@@ -22,10 +22,17 @@ entity capture is
         o_pin_sh: out std_logic;
         o_pin_icg: out std_logic;
         o_pin_mclk: out std_logic;
-        o_ccd_busy: out std_logic;
 
-        o_data_rdy: out std_logic;
-        o_data: out std_logic_vector(15 downto 0)
+        i_fifo_raw_rd: in std_logic;
+        i_fifo_pl_rd: in std_logic;
+        o_fifo_raw_data: out std_logic_vector(15 downto 0);
+        o_fifo_raw_wmark: out std_logic;
+        o_fifo_pl_data: out std_logic_vector(15 downto 0);
+        o_fifo_pl_wmark: out std_logic;
+
+        o_busy: out std_logic;
+
+        o_errors: out t_err_bitmap
     );
 end entity capture;
 
@@ -33,12 +40,16 @@ architecture behaviour of capture is
     signal r_ccd_rdy: std_logic;
     signal r_ccd_busy: std_logic;
     signal r_ccd_start: std_logic;
-    signal r_ccd_data: std_logic_vector(o_data'range);
+    signal r_ccd_data: std_logic_vector(15 downto 0);
+
+    signal r_total_avg_busy: std_logic;
+    signal r_total_avg_rdy: std_logic;
+    signal r_total_avg_data: std_logic_vector(r_ccd_data'range);
 
     signal r_moving_avg_rdy: std_logic;
-    signal r_moving_avg_data: std_logic_vector(o_data'range);
+    signal r_moving_avg_data: std_logic_vector(r_ccd_data'range);
 
-    constant c_num_elements: integer := 3648;
+    constant c_num_elements: integer := 364;
 begin
     r_ccd_start <= i_start;
 
@@ -66,27 +77,68 @@ begin
             o_pin_icg => o_pin_icg,
             o_pin_mclk => o_pin_mclk,
 
-            o_ccd_busy => r_ccd_busy,
+            o_busy => r_ccd_busy,
             o_data_rdy => r_ccd_rdy,
             o_data => r_ccd_data
         );
 
-    u_moving_avg: entity work.avg_moving
-        generic map (
-            C_NUM_ELEMENTS => c_num_elements
+    u_fifo_raw: entity work.frame_fifo
+        generic map(
+            C_OVERFLOW => ERR_FIFO_RAW_OVERFLOW,
+            C_UNDERFLOW => ERR_FIFO_RAW_UNDERFLOW
         )
         port map(
             i_clk => i_clk,
             i_rst_n => i_rst_n,
-            i_n => get_reg(i_regmap, REG_MOVING_AVG_N),
-            i_rdy => r_ccd_rdy,
+            i_wr => r_ccd_rdy,
             i_data => r_ccd_data,
+            i_rd => i_fifo_raw_rd,
+            o_data => o_fifo_raw_data,
+            o_watermark => o_fifo_raw_wmark,
+            o_errors => o_errors
+        );
+
+    u_total_avg: entity work.avg_total
+        port map(
+            i_clk => i_clk,
+            i_rst_n => i_rst_n,
+            i_n => get_reg(i_regmap, REG_TOTAL_AVG_N)(4 downto 0),
+            i_data => r_ccd_data,
+            i_en => r_ccd_busy,
+            i_rdy => r_ccd_rdy,
+            o_data => r_total_avg_data,
+            o_rdy => r_total_avg_rdy,
+            o_busy => r_total_avg_busy
+        );
+
+    u_moving_avg: entity work.avg_moving
+        port map(
+            i_clk => i_clk,
+            i_rst_n => i_rst_n,
+            i_n => get_reg(i_regmap, REG_MOVING_AVG_N),
+            i_en => r_total_avg_busy,
+            i_rdy => r_total_avg_rdy,
+            i_data => r_total_avg_data,
             o_rdy => r_moving_avg_rdy,
             o_data => r_moving_avg_data
         );
 
-    o_ccd_busy <= r_ccd_busy;
-    o_data_rdy <= r_ccd_rdy;
-    o_data <= r_ccd_data;
+    u_fifo_pl: entity work.frame_fifo
+        generic map(
+            C_OVERFLOW => ERR_FIFO_PL_OVERFLOW,
+            C_UNDERFLOW => ERR_FIFO_PL_UNDERFLOW
+        )
+        port map(
+            i_clk => i_clk,
+            i_rst_n => i_rst_n,
+            i_wr => r_moving_avg_rdy,
+            i_data => r_moving_avg_data,
+            i_rd => i_fifo_pl_rd,
+            o_data => o_fifo_pl_data,
+            o_watermark => o_fifo_pl_wmark,
+            o_errors => o_errors
+        );
+
+    o_busy <= r_ccd_busy;
 
 end architecture behaviour;

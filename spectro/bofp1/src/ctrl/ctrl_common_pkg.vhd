@@ -5,7 +5,8 @@ use ieee.numeric_std.all;
 
 package ctrl_common is
     type t_reg is (
-        REG_STREAM,
+        REG_STREAM_RAW,
+        REG_STREAM_PL,
         REG_SAMPLE,
         REG_RESET,
         REG_SHDIV1,
@@ -17,6 +18,10 @@ package ctrl_common is
         REG_STATUS
     );
     constant t_reg_len: integer := t_reg'pos(t_reg'high) + 1;
+
+    type t_prc_ctrl is (
+        PRC_WMARK_SRC
+    );
 
     subtype t_reg_vector is std_logic_vector(7 downto 0);
     type t_regmap is array(t_reg_len-1 downto 0) of t_reg_vector;
@@ -44,6 +49,12 @@ package ctrl_common is
                       constant reg: in t_reg;
                       constant val: in t_reg_vector);
 
+    -- brief Get bit at index `idx` in the PRC register
+    -- param regmap Regmap to access
+    -- param idx Index to access bit at
+    -- return std_logic
+    function get_prc(regmap: t_regmap; idx: t_prc_ctrl) return std_logic;
+
     -- brief Parse register represented in `code`
     -- param code Unparsed register
     -- return t_reg Parsed register
@@ -60,8 +71,10 @@ package ctrl_common is
     function is_write(code: t_reg_vector) return boolean;
 
     type t_err is (
-        ERR_FIFO_OVERFLOW,
-        ERR_FIFO_UNDERFLOW
+        ERR_FIFO_RAW_OVERFLOW,
+        ERR_FIFO_RAW_UNDERFLOW,
+        ERR_FIFO_PL_OVERFLOW,
+        ERR_FIFO_PL_UNDERFLOW
     );
     constant c_err_len: integer := t_err'pos(t_err'high) + 1;
     subtype t_err_bitmap is std_logic_vector(c_err_len-1 downto 0);
@@ -88,6 +101,11 @@ package body ctrl_common is
     begin
         regmap(t_reg'pos(reg)) <= val;
     end procedure set_reg;
+
+    function get_prc(regmap: t_regmap; idx: t_prc_ctrl) return std_logic is
+    begin
+        return get_reg(regmap, REG_PRC_CONTROL)(t_prc_ctrl'pos(idx));
+    end function get_prc;
 
     function parse_reg(code: t_reg_vector)
     return t_reg is

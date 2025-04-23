@@ -18,9 +18,15 @@ entity ctrl is
         i_mosi: in std_logic;
         o_miso: out std_logic;
 
-        i_fifo_data: in std_logic_vector(15 downto 0);
-        o_fifo_rd: out std_logic;
-    
+        i_fifo_raw_data: in std_logic_vector(15 downto 0);
+        i_fifo_pl_data: in std_logic_vector(15 downto 0);
+        i_fifo_raw_wmark: in std_logic;
+        i_fifo_pl_wmark: in std_logic;
+        o_fifo_raw_rd: out std_logic;
+        o_fifo_pl_rd: out std_logic;
+
+        o_fifo_wmark: out std_logic;
+
         i_errors: in t_err_bitmap;
         io_regmap: inout t_regmap
     );
@@ -36,6 +42,9 @@ architecture behaviour of ctrl is
 
     -- Streaming from FIFO
     signal r_streaming: boolean;
+
+    type t_stream is (S_RAW, S_PIPELINE);
+    signal r_stream_mode: t_stream;
 
     signal r_shift_done: std_logic;
     signal r_sample_done: std_logic;
@@ -53,6 +62,8 @@ architecture behaviour of ctrl is
     signal r_errors: t_err_bitmap;
     signal r_err_clear: std_logic;
 
+    signal r_fifo_rd: std_logic;
+
     -- Current range of the SPI output shift register
     function cur_shf_range(data: std_logic_vector; count: unsigned)
     return std_logic_vector is
@@ -64,7 +75,6 @@ architecture behaviour of ctrl is
     end function cur_shf_range;
 begin
     r_rst_n_mux <= '0' when (i_rst_n = '0' or r_spi_active = '0') else '1';
-    r_out <= i_fifo_data;
 
     -- Set errors in the regmap.
     u_err: entity work.ctrl_err
@@ -120,6 +130,19 @@ begin
             o_roll => r_shift_rolled
         );
 
+    p_out: process(all)
+    begin
+        if r_streaming then
+            if r_stream_mode = S_RAW then
+                r_out <= i_fifo_raw_data;
+            else
+                r_out <= i_fifo_pl_data;
+            end if;
+        else
+            r_out <= (others => '0');
+        end if;
+    end process p_out;
+
     -- Load current part of the data that is to be shifted out
     p_out_shf: process(i_clk)
     begin
@@ -136,13 +159,26 @@ begin
     p_stream_load: process(i_clk)
     begin
         if rising_edge(i_clk) then
-            o_fifo_rd <= '0';
+            r_fifo_rd <= '0';
 
             if r_streaming and r_shift_rolled = '1' then
-                o_fifo_rd <= '1';
+                r_fifo_rd <= '1';
             end if;
         end if;
     end process p_stream_load;
+
+    -- Forward read signal to the correct FIFO
+    p_rd_mux: process(all)
+    begin
+        o_fifo_pl_rd <= '0';
+        o_fifo_raw_rd <= '0';
+
+        if r_stream_mode = S_RAW then
+            o_fifo_raw_rd <= r_fifo_rd;
+        else
+            o_fifo_pl_rd <= r_fifo_rd;
+        end if;
+    end process p_rd_mux;
 
     -- Load the first 8 bits into a register to contain the register address
     -- and write bit.
@@ -170,13 +206,31 @@ begin
 
             if r_rst_n_mux = '0' then
                 r_streaming <= false;
-            elsif r_shift_rolled = '1' and is_read then
-                if parse_reg(r_reg_raw) = REG_STREAM then
-                    r_streaming <= true;
-                end if;
+                r_stream_mode <= S_RAW;
+            elsif not r_streaming and r_shift_rolled = '1' and is_read then
+                case parse_reg(r_reg_raw) is
+                    when REG_STREAM_RAW =>
+                        r_streaming <= true;
+                        r_stream_mode <= S_RAW;
+                    
+                    when REG_STREAM_PL =>
+                        r_streaming <= true;
+                        r_stream_mode <= S_PIPELINE;
+
+                    when others => null;
+                end case;
             end if;
         end if;
     end process p_stream;
+
+    p_fifo_wmark: process(all)
+    begin
+        if get_prc(io_regmap, PRC_WMARK_SRC) = '1' then
+            o_fifo_wmark <= i_fifo_pl_wmark;
+        else
+            o_fifo_wmark <= i_fifo_raw_wmark;
+        end if;
+    end process p_fifo_wmark;
 
     -- Read registere value
     p_read: process(i_clk)
@@ -216,7 +270,8 @@ begin
                     when REG_STATUS =>
                         r_err_clear <= '1';
 
-                    when REG_SHDIV1 | REG_SHDIV2 | REG_SHDIV3 =>
+                    when REG_SHDIV1 | REG_SHDIV2 | REG_SHDIV3
+                         | REG_PRC_CONTROL =>
                         set_reg(io_regmap, reg, r_in_buf);
 
                     when others => null;

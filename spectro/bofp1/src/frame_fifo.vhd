@@ -7,6 +7,10 @@ use work.vivado.all;
 use work.ctrl_common.all;
 
 entity frame_fifo is
+    generic (
+        C_OVERFLOW: t_err;
+        C_UNDERFLOW: t_err
+    );
     port (
         i_clk: in std_logic;
         i_rst_n: in std_logic;
@@ -48,15 +52,15 @@ begin
     begin
         if rising_edge(i_clk) then
             if i_rst_n /= '0' then
-                set_err(o_errors, ERR_FIFO_OVERFLOW, '0');
-                set_err(o_errors, ERR_FIFO_UNDERFLOW, '0');
+                set_err(o_errors, C_OVERFLOW, '0');
+                set_err(o_errors, C_UNDERFLOW, '0');
 
                 if i_wr = '1' and r_full = '1' then
-                    set_err(o_errors, ERR_FIFO_OVERFLOW, '1');
+                    set_err(o_errors, C_OVERFLOW, '1');
                 end if;
 
                 if i_rd = '1' and r_empty = '1' then
-                    set_err(o_errors, ERR_FIFO_UNDERFLOW, '1');
+                    set_err(o_errors, C_UNDERFLOW, '1');
                 end if;
             end if;
         end if;

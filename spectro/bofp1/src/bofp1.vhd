@@ -40,15 +40,17 @@ architecture structural of bofp1 is
     signal r_rst_gen: std_logic;
 
     signal r_cap_start: std_logic; -- Driven by control module
-    signal r_cap_data: std_logic_vector(15 downto 0);
-    signal r_cap_rdy: std_logic;
+    
+    signal r_fifo_pl_rd: std_logic;
+    signal r_fifo_raw_rd: std_logic;
+    signal r_fifo_pl_wmark: std_logic;
+    signal r_fifo_raw_wmark: std_logic;
+    signal r_fifo_pl_data: std_logic_vector(15 downto 0);
+    signal r_fifo_raw_data: std_logic_vector(15 downto 0);
 
     -- Generated clocks
     signal r_adc_sclk2: std_logic;
     signal r_clk_main: std_logic;
-
-    signal r_fifo_rd: std_logic;
-    signal r_fifo_data: std_logic_vector(15 downto 0);
 
     signal r_regmap: t_regmap;
     signal r_errors: t_err_bitmap;
@@ -91,21 +93,15 @@ begin
             o_pin_sh => o_ccd_sh,
             o_pin_mclk => o_ccd_mclk,
             o_pin_icg => o_ccd_icg,
-            o_ccd_busy => o_ccd_busy,
+            o_busy => o_ccd_busy,
 
-            o_data => r_cap_data,
-            o_data_rdy => r_cap_rdy
-        );
+            i_fifo_pl_rd => r_fifo_pl_rd,
+            i_fifo_raw_rd => r_fifo_raw_rd,
+            o_fifo_pl_wmark => r_fifo_pl_wmark,
+            o_fifo_raw_wmark => r_fifo_raw_wmark,
+            o_fifo_pl_data => r_fifo_pl_data,
+            o_fifo_raw_data => r_fifo_raw_data,
 
-    u_fifo: entity work.frame_fifo
-        port map(
-            i_clk => r_clk_main,
-            i_rst_n => r_rst_n,
-            i_wr => r_cap_rdy,
-            i_data => r_cap_data,
-            i_rd => r_fifo_rd,
-            o_data => r_fifo_data,
-            o_watermark => o_fifo_wmark,
             o_errors => r_errors
         );
 
@@ -121,8 +117,14 @@ begin
             i_mosi => i_spi_sub_mosi,
             o_miso => o_spi_sub_miso,
 
-            i_fifo_data => r_fifo_data,
-            o_fifo_rd => r_fifo_rd,
+            i_fifo_pl_data => r_fifo_pl_data,
+            i_fifo_raw_data => r_fifo_raw_data,
+            i_fifo_pl_wmark => r_fifo_pl_wmark,
+            i_fifo_raw_wmark => r_fifo_raw_wmark,
+            o_fifo_pl_rd => r_fifo_pl_rd,
+            o_fifo_raw_rd => r_fifo_raw_rd,
+
+            o_fifo_wmark => o_fifo_wmark,
 
             i_errors => r_errors,
             io_regmap => r_regmap

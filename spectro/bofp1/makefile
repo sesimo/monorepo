@@ -29,11 +29,11 @@ SOURCES=\
 	src/ctrl/ctrl_err.vhd \
 	src/ctrl/ctrl.vhd \
 	src/frame_ram.vhd \
+	src/frame_fifo.vhd \
 	src/window_fifo.vhd \
 	src/avg_moving.vhd \
 	src/avg_total.vhd \
 	src/capture.vhd \
-	src/frame_fifo.vhd \
 	src/bofp1.vhd
 
 GHDL_ARGS=--workdir=$(realpath build) --std=08 -frelaxed-rules \

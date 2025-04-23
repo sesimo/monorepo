@@ -8,8 +8,7 @@ entity capture is
         i_clk: in std_logic;
         i_rst_n: in std_logic;
         i_start: in std_logic;
-        i_psc_div: in std_logic_vector(7 downto 0);
-        i_sh_div: in std_logic_vector(7 downto 0);
+        i_sh_div: in std_logic_vector(23 downto 0);
 
         i_adc_eoc: in std_logic;
         o_adc_stconv: out std_logic;
@@ -44,7 +43,6 @@ begin
             i_clk => i_clk,
             i_rst_n => i_rst_n,
             i_start => r_ccd_start,
-            i_psc_div => i_psc_div,
             i_sh_div => i_sh_div,
             
             i_adc_eoc => i_adc_eoc,

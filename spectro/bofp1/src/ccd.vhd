@@ -18,8 +18,7 @@ entity tcd1304 is
         i_clk: in std_logic;
         i_rst_n: in std_logic;
         i_start: in std_logic;
-        i_psc_div: in std_logic_vector(7 downto 0);
-        i_sh_div: in std_logic_vector(7 downto 0);
+        i_sh_div: in std_logic_vector(23 downto 0);
 
         i_adc_eoc: in std_logic;
         o_adc_stconv: out std_logic;
@@ -53,9 +52,6 @@ architecture rtl of tcd1304 is
     signal r_mclk_buf: std_logic;
     signal r_mclk_en: std_logic;
 
-    signal r_psc_en: std_logic;
-    signal r_psc_div: std_logic_vector(i_psc_div'high+1 downto 0);
-
     signal r_sh_en: std_logic;
     signal r_sh_delayed: std_logic;
     signal r_sh_shf: std_logic_vector(G_SH_DELAY_CYC-1 downto 0);
@@ -71,9 +67,6 @@ architecture rtl of tcd1304 is
     signal r_cnt_rolled: std_logic;
     signal r_icg_rolled: std_logic;
 begin
-
-    r_psc_div <= std_logic_vector(resize(
-                 unsigned(i_psc_div) + 1, r_psc_div'length));
     r_sh_div <= std_logic_vector(resize(
                  unsigned(i_sh_div) + 1, r_sh_div'length));
 
@@ -104,19 +97,6 @@ begin
             o_out => r_mclk_buf
         );
 
-    -- Counter for the prescaler
-    u_counter_psc: entity work.counter(rtl)
-        generic map(
-            G_WIDTH => r_psc_div'length
-        )
-        port map(
-            i_clk => i_clk,
-            i_rst_n => i_rst_n,
-            i_en => r_mclk_en,
-            i_max => r_psc_div,
-            o_roll => r_psc_en
-        );
-
     -- Counter for SH signal
     u_counter_sh: entity work.counter(rtl)
         generic map(
@@ -125,7 +105,7 @@ begin
         port map(
             i_clk => i_clk,
             i_rst_n => i_rst_n,
-            i_en => r_psc_en,
+            i_en => r_mclk_en,
             i_max => r_sh_div,
             o_roll => r_sh_en
         );

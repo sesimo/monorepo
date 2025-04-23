@@ -195,11 +195,14 @@ begin
                     when REG_RESET =>
                         o_rst <= '1';
 
-                    when REG_PSCDIV =>
-                        o_regmap.pscdiv <= r_in_buf;
+                    when REG_SHDIV1 =>
+                        o_regmap.shdiv1 <= r_in_buf;
 
-                    when REG_SHDIV =>
-                        o_regmap.shdiv <= r_in_buf;
+                    when REG_SHDIV2 =>
+                        o_regmap.shdiv2 <= r_in_buf;
+
+                    when REG_SHDIV3 =>
+                        o_regmap.shdiv3 <= r_in_buf;
 
                     when others => null;
                 end case;

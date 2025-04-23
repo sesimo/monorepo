@@ -181,9 +181,14 @@ int bofp1_enable_read(const struct device *dev)
         status = gpio_pin_interrupt_configure_dt(&cfg->fifo_w_gpios,
                                                  GPIO_INT_EDGE_TO_ACTIVE);
 
+        /* Reschedule the watchdog with a timeout of integration time + 5ms.
+         * This is done because the CCD driver on the FPGA synchronizes to
+         * the integration time, and may not start until after the
+         * integration time has passed. It will then use roughly 5ms to
+         * collect 1024 samples, which is more than what we need. */
         k_work_reschedule(
                 &data->watchdog_work,
-                K_NSEC(bofp1_integration_time(dev, data->shdiv) + 1000000));
+                K_NSEC(bofp1_integration_time(dev, data->shdiv) + 5000000));
 
         return status;
 }

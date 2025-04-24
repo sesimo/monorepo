@@ -33,6 +33,7 @@ SOURCES=\
 	src/window_fifo.vhd \
 	src/avg_moving.vhd \
 	src/avg_total.vhd \
+	src/dark_current.vhd \
 	src/capture.vhd \
 	src/bofp1.vhd
 

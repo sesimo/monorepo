@@ -51,18 +51,24 @@ architecture bhv of tb_bofp1 is
     constant c_reg_prc_ctrl: std_logic_vector(7 downto 0) := x"87";
     constant c_reg_moving_avg_n: std_logic_vector(7 downto 0) := x"88";
     constant c_reg_total_avg_n: std_logic_vector(7 downto 0) := x"89";
+    constant c_reg_status: std_logic_vector(7 downto 0) := x"8a";
+    constant c_reg_dc_calib: std_logic_vector(15 downto 0) := x"8b00";
 
     constant c_clk_period: time := (1.0 / real(G_CLK_FREQ)) * (1 sec);
     constant c_sclk_period: time := c_clk_period * G_SCLK_DIV;
 
     constant c_ccd_pix_count: integer := 364;
+    constant c_val_base: integer := 3000;
     constant c_dc_base: integer := 4000;
 
     constant c_total_avg_n: integer := 3;
     constant c_moving_avg_n: integer := 2;
     constant c_moving_avg_n_sum: integer := c_moving_avg_n * 2 + 1;
 
-    signal r_frame_count: integer := 0;
+    signal r_dc_calib: boolean := false;
+
+    signal r_read_frame_count: integer := 0;
+    signal r_ccd_frame_count: integer := 0;
 
     type t_moving_avg_window is array(c_moving_avg_n_sum-1 downto 0) of unsigned(15 downto 0);
 
@@ -74,28 +80,60 @@ architecture bhv of tb_bofp1 is
         end if;
     end procedure wait_rst;
 
+    function calc_dc_val(clk_count: integer) return integer is
+    begin
+        return c_dc_base + clk_count;
+    end function calc_dc_val;
+
+    procedure inc_clk_count(variable clk_count: inout integer) is
+    begin
+        clk_count := (clk_count + 1) mod c_ccd_pix_count;
+    end procedure inc_clk_count;
+
+    procedure inc_noise_count(variable noise_count: inout integer) is
+    begin
+        noise_count := (noise_count + 1) mod 10;
+    end procedure inc_noise_count;
+
+    procedure calc_val(variable val: out integer;
+                       variable clk_count: inout integer;
+                       variable noise_count: inout integer) is
+        variable dc: integer;
+    begin
+        dc := calc_dc_val(clk_count);
+        val := dc + c_val_base + clk_count + noise_count;
+
+        inc_clk_count(clk_count);
+        inc_noise_count(noise_count);
+    end procedure calc_val;
+
     procedure calc_ccd_val(variable val: out integer;
                            variable clk_count: inout integer;
-                           variable noise_count: inout integer) is
+                           variable noise_count: inout integer;
+                           constant frame_count: in integer) is
         variable iter_offset: integer;
     begin
-        -- Add an offset so that it is easy to calculate the average later
-        -- The average should be the same value as the value produced
-        -- when iter_offset=0
-        iter_offset := -integer(floor(real(c_total_avg_n)/2.0)) + r_frame_count;
+        if not r_dc_calib then
+            -- Add an offset so that it is easy to calculate the average later
+            -- The average should be the same value as the value produced
+            -- when iter_offset=0
+            iter_offset := -integer(floor(real(c_total_avg_n)/2.0)) + frame_count;
 
-        val := c_dc_base + iter_offset + clk_count + noise_count;
-        clk_count := (clk_count + 1) mod c_ccd_pix_count;
-        noise_count := (noise_count + 1) mod 10;
+            calc_val(val, clk_count, noise_count);
+            val := val + iter_offset;
+        else
+            val := calc_dc_val(clk_count);
+            inc_clk_count(clk_count);
+        end if;
     end procedure calc_ccd_val;
 
     procedure calc_total_avg_val(variable val: out unsigned;
                                  variable clk_count: inout integer;
                                  variable noise_count: inout integer) is
+        variable ival: integer;
     begin
-        val := to_unsigned(c_dc_base + clk_count + noise_count, val'length);
-        clk_count := (clk_count + 1) mod c_ccd_pix_count;
-        noise_count := (noise_count + 1) mod 10;
+        calc_val(ival, clk_count, noise_count);
+        val := to_unsigned(ival, val'length);
     end procedure calc_total_avg_val;
 
     procedure calc_moving_avg_val(variable val: out unsigned;
@@ -165,7 +203,7 @@ begin
             if rising_edge(r_ccd_mclk) then
                 if r_ccd_running then
                     if mclk_count = 0 then
-                        calc_ccd_val(val, data_cycles, noise_count);
+                        calc_ccd_val(val, data_cycles, noise_count, r_ccd_frame_count);
 
                         r_dummy_val <= to_unsigned(val, r_dummy_val'length);
                         r_ccd_done <= data_cycles = 0;
@@ -195,6 +233,7 @@ begin
             r_ccd_running <= true;
             wait until r_ccd_done;
             r_ccd_running <= false;
+            r_ccd_frame_count <= (r_ccd_frame_count + 1) mod c_total_avg_n;
         end process p_ccd_start;
 
         -- Handle STconv for the ADC and generate EOC along with making data
@@ -303,6 +342,8 @@ begin
         variable pl_val: unsigned(15 downto 0);
         variable pl_moving_avg_window: t_moving_avg_window;
 
+        variable dc_moving_avg_window: t_moving_avg_window;
+
         -- Check the readings from one stream (16 values)
         procedure check_adc_readings(count: integer; offset: integer;
                                      data: std_logic_vector) is
@@ -313,7 +354,7 @@ begin
                 head := data'high - i*16;
                 idx := offset + i;
 
-                calc_ccd_val(ccd_val, ccd_cycles, ccd_noise);
+                calc_ccd_val(ccd_val, ccd_cycles, ccd_noise, r_read_frame_count);
 
                 check_value(
                     data(head downto head-15),
@@ -335,18 +376,38 @@ begin
             window := ret;
         end procedure init_pl_window;
 
+        procedure init_dc_window(variable window: out t_moving_avg_window) is
+            variable ret: t_moving_avg_window;
+            variable val: unsigned(15 downto 0);
+        begin
+            for i in 1 to c_moving_avg_n_sum-1 loop
+                val := to_unsigned(calc_dc_val(i-1), val'length);
+                ret := ret(ret'high-1 downto 0) & val;
+            end loop;
+
+            window := ret;
+        end procedure init_dc_window;
+
         -- Check the readings from one stream (16 values)
         procedure check_pl_readings(count: integer; offset: integer;
                                      data: std_logic_vector) is
             variable head: integer;
             variable idx: integer;
+            variable dc: unsigned(15 downto 0);
         begin
             for i in 0 to count-1 loop
                 head := data'high - i*16;
                 idx := offset + i;
 
+                dc := to_unsigned(calc_dc_val(pl_cycles), dc'length);
+                calc_moving_avg_val(dc, dc_moving_avg_window, dc);
+
                 calc_total_avg_val(pl_val, pl_cycles, pl_noise);
+                report "total: " & to_hstring(pl_val) & ", cycles: " & integer'image(pl_cycles) & ", noise" & integer'image(pl_noise) & ", uh: " & integer'image(r_read_frame_count);
                 calc_moving_avg_val(pl_val, pl_moving_avg_window, pl_val);
+
+                report "pl: " & to_hstring(pl_val) & ", dc: " & to_hstring(dc);
+                pl_val := pl_val - dc;
 
                 if idx < c_ccd_pix_count - c_moving_avg_n_sum then
                     check_value(
@@ -378,7 +439,9 @@ begin
             tx_data(tx_data'high downto tx_data'high-15) := c_reg_stream_raw;
 
             spi_master_transmit_and_receive(
-                tx_data, rx_data, "FIFO stream raw", r_spi_sub_if,
+                tx_data(tx_data'high downto tx_data'length - (len+1) * 16),
+                rx_data(rx_data'high downto rx_data'length - (len+1) * 16),
+                "FIFO stream raw", r_spi_sub_if,
                 config => r_spi_conf
             );
 
@@ -395,7 +458,9 @@ begin
             tx_data(tx_data'high downto tx_data'high-15) := c_reg_stream_pl;
 
             spi_master_transmit_and_receive(
-                tx_data, rx_data, "FIFO stream pipeline", r_spi_sub_if,
+                tx_data(tx_data'high downto tx_data'length - (len+1) * 16),
+                rx_data(rx_data'high downto rx_data'length - (len+1) * 16),
+                "FIFO stream pipeline", r_spi_sub_if,
                 config => r_spi_conf
             );
 
@@ -457,7 +522,6 @@ begin
             -- can be read out safely at this watermark.
             set_prc_ctrl(read_pl);
 
-            cmd_sample;
             if r_ccd_busy /= '1' then
                 wait until r_ccd_busy = '1';
             end if;
@@ -493,6 +557,28 @@ begin
             ccd_noise := 0;
             wait for 1 ps;
         end procedure check_frame;
+
+        procedure do_dc_calib is
+        begin
+            r_dc_calib <= true;
+
+            init_dc_window(dc_moving_avg_window);
+
+            set_prc_ctrl(true);
+
+            spi_master_transmit(
+                c_reg_dc_calib,
+                "Do DC calib",
+                r_spi_sub_if,
+                config => r_spi_conf
+            );
+            wait until r_ccd_busy = '0';
+
+            ccd_cycles := 0;
+            ccd_noise := 0;
+
+            r_dc_calib <= false;
+        end procedure do_dc_calib;
     begin
         report_global_ctrl(VOID);
         report_msg_id_panel(VOID);
@@ -527,10 +613,13 @@ begin
         set_moving_avg_n(c_moving_avg_n);
         set_total_avg_n(c_total_avg_n);
 
+        do_dc_calib;
+
+        cmd_sample;
         for j in 1 to c_total_avg_n loop
+            r_read_frame_count <= r_ccd_frame_count;
             check_frame(j = c_total_avg_n);
 
-            r_frame_count <= r_frame_count + 1;
             wait for 1 ps;
         end loop;
 

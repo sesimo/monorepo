@@ -46,7 +46,7 @@ begin
         )
         port map(
             i_clk => i_clk,
-            i_rst_n => i_rst_n,
+            i_rst_n => i_rst_n and i_en,
             i_rd => r_fifo_rd,
             i_wr => r_fifo_wr,
             i_data => i_data,
@@ -115,7 +115,7 @@ begin
     p_shift: process(i_clk)
     begin
         if rising_edge(i_clk) then
-            if i_rst_n = '0' then
+            if i_rst_n = '0' or i_en = '0' then
                 r_sum <= (others => '0');
             elsif i_rdy = '1' then
                 if r_state = S_START then

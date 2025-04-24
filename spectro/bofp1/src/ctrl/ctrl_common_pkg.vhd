@@ -15,7 +15,8 @@ package ctrl_common is
         REG_PRC_CONTROL, -- Processing control
         REG_MOVING_AVG_N,
         REG_TOTAL_AVG_N,
-        REG_STATUS
+        REG_STATUS,
+        REG_DC_CALIB
     );
     constant t_reg_len: integer := t_reg'pos(t_reg'high) + 1;
 
@@ -75,7 +76,8 @@ package ctrl_common is
         ERR_FIFO_RAW_OVERFLOW,
         ERR_FIFO_RAW_UNDERFLOW,
         ERR_FIFO_PL_OVERFLOW,
-        ERR_FIFO_PL_UNDERFLOW
+        ERR_FIFO_PL_UNDERFLOW,
+        ERR_DC_UNDERFLOW
     );
     constant c_err_len: integer := t_err'pos(t_err'high) + 1;
     subtype t_err_bitmap is std_logic_vector(c_err_len-1 downto 0);

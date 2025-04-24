@@ -28,6 +28,8 @@ entity capture is
         o_fifo_raw_data: out std_logic_vector(15 downto 0);
         o_fifo_pl_data: out std_logic_vector(15 downto 0);
 
+        i_dc_calib: in std_logic;
+
         o_busy: out std_logic;
         o_fifo_wmark: out std_logic;
 
@@ -49,12 +51,28 @@ architecture behaviour of capture is
     signal r_moving_avg_data: std_logic_vector(r_ccd_data'range);
     signal r_moving_avg_busy: std_logic;
 
+    signal r_dc_rdy: std_logic;
+    signal r_dc_data: std_logic_vector(r_ccd_data'range);
+    signal r_dc_busy: std_logic;
+    signal r_dc_calib: std_logic;
+
     signal r_fifo_pl_wmark: std_logic;
     signal r_fifo_raw_wmark: std_logic;
 
+    signal r_fifo_raw_wr: std_logic;
+    signal r_fifo_pl_wr: std_logic;
+
+    type t_state is (
+        S_IDLE, S_STARTING, S_WAITING, S_RUNNING, S_STOPPING_1,
+        S_STOPPING_2, S_STOPPING_3
+    );
+    signal r_state: t_state;
+
     constant c_num_elements: integer := 364;
 begin
-    r_ccd_start <= i_start;
+    r_ccd_start <= '1' when r_state = S_STARTING else '0';
+    r_fifo_pl_wr <= r_dc_rdy and not r_dc_calib;
+    r_fifo_raw_wr <= r_ccd_rdy and not r_dc_calib;
 
     u_ccd: entity work.tcd1304(rtl)
         generic map(
@@ -93,7 +111,7 @@ begin
         port map(
             i_clk => i_clk,
             i_rst_n => i_rst_n,
-            i_wr => r_ccd_rdy,
+            i_wr => r_fifo_raw_wr,
             i_data => r_ccd_data,
             i_rd => i_fifo_raw_rd,
             o_data => o_fifo_raw_data,
@@ -127,6 +145,20 @@ begin
             o_data => r_moving_avg_data
         );
 
+    u_dark_current: entity work.dark_current
+        port map(
+            i_clk => i_clk,
+            i_rst_n => i_rst_n,
+            i_calib => i_dc_calib,
+            i_en => r_moving_avg_busy,
+            i_rdy => r_moving_avg_rdy,
+            i_data => r_moving_avg_data,
+            o_rdy => r_dc_rdy,
+            o_busy => r_dc_busy,
+            o_data => r_dc_data,
+            o_errors => o_errors
+        );
+
     u_fifo_pl: entity work.frame_fifo
         generic map(
             C_OVERFLOW => ERR_FIFO_PL_OVERFLOW,
@@ -135,8 +167,8 @@ begin
         port map(
             i_clk => i_clk,
             i_rst_n => i_rst_n,
-            i_wr => r_moving_avg_rdy,
-            i_data => r_moving_avg_data,
+            i_wr => r_fifo_pl_wr,
+            i_data => r_dc_data,
             i_rd => i_fifo_pl_rd,
             o_data => o_fifo_pl_data,
             o_watermark => r_fifo_pl_wmark,
@@ -160,5 +192,61 @@ begin
             o_busy <= r_ccd_busy;
         end if;
     end process p_busy;
+
+    p_calib: process(i_clk)
+    begin
+        if rising_edge(i_clk) then
+            if i_dc_calib = '1' then
+                r_dc_calib <= '1';
+            elsif r_state = S_IDLE then
+                r_dc_calib <= '0';
+            end if;
+        end if;
+    end process p_calib;
+
+    p_state: process(i_clk)
+    begin
+        if rising_edge(i_clk) then
+            if i_rst_n = '0' then
+                r_state <= S_IDLE;
+            else
+                case r_state is
+                    when S_IDLE =>
+                        if i_dc_calib = '1' or i_start = '1' then
+                            r_state <= S_STARTING;
+                        end if;
+
+                    when S_STARTING =>
+                        r_state <= S_WAITING;
+
+                    when S_WAITING =>
+                        if r_dc_busy = '1' then
+                            r_state <= S_RUNNING;
+                        end if;
+
+                    when S_RUNNING =>
+                        if r_ccd_busy = '0' then
+                            r_state <= S_STOPPING_1;
+                        end if;
+
+                    when S_STOPPING_1 =>
+                        r_state <= S_STOPPING_2;
+
+                    when S_STOPPING_2 =>
+                        r_state <= S_STOPPING_3;
+
+                    -- Delay checking as it may take time for the busy signal
+                    -- of the total average stage to fall.
+                    when S_STOPPING_3 =>
+                        if r_total_avg_busy = '1' then
+                            r_state <= S_STARTING;
+                        elsif r_dc_busy = '0' then
+                            r_state <= S_IDLE;
+                        end if;
+
+                end case;
+            end if;
+        end if;
+    end process p_state;
 
 end architecture behaviour;

@@ -40,6 +40,7 @@ architecture structural of bofp1 is
     signal r_rst_gen: std_logic;
 
     signal r_cap_start: std_logic; -- Driven by control module
+    signal r_dc_calib: std_logic;
     
     signal r_fifo_pl_rd: std_logic;
     signal r_fifo_raw_rd: std_logic;
@@ -98,6 +99,8 @@ begin
             o_fifo_pl_data => r_fifo_pl_data,
             o_fifo_raw_data => r_fifo_raw_data,
 
+            i_dc_calib => r_dc_calib,
+
             o_fifo_wmark => o_fifo_wmark,
             o_errors => r_errors
         );
@@ -118,6 +121,8 @@ begin
             i_fifo_raw_data => r_fifo_raw_data,
             o_fifo_pl_rd => r_fifo_pl_rd,
             o_fifo_raw_rd => r_fifo_raw_rd,
+
+            o_dc_calib => r_dc_calib,
 
             i_errors => r_errors,
             io_regmap => r_regmap

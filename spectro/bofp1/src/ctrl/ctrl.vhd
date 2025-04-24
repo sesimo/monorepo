@@ -23,6 +23,8 @@ entity ctrl is
         o_fifo_raw_rd: out std_logic;
         o_fifo_pl_rd: out std_logic;
 
+        o_dc_calib: out std_logic;
+
         i_errors: in t_err_bitmap;
         io_regmap: inout t_regmap
     );
@@ -240,6 +242,7 @@ begin
         if rising_edge(i_clk) then
             o_ccd_sample <= '0';
             o_rst <= '0';
+            o_dc_calib <= '0';
             r_err_clear <= '0';
 
             if i_rst_n = '0' then
@@ -253,6 +256,9 @@ begin
 
                     when REG_RESET =>
                         o_rst <= '1';
+
+                    when REG_DC_CALIB =>
+                        o_dc_calib <= '1';
 
                     when REG_STATUS =>
                         r_err_clear <= '1';

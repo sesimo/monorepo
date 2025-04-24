@@ -7,6 +7,9 @@ use work.ctrl_common.all;
 use work.vivado.all;
 
 entity bofp1 is
+    generic (
+        C_CCD_NUM_ELEMENTS: integer := 3694
+    );
     port (
         i_clk: in std_logic;
         i_rst_n: in std_logic;
@@ -76,6 +79,9 @@ begin
         );
 
     u_capture: entity work.capture
+        generic map(
+            C_CCD_NUM_ELEMENTS => C_CCD_NUM_ELEMENTS
+        )
         port map(
             i_clk => r_clk_main,
             i_rst_n => r_rst_n,

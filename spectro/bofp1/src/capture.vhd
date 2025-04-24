@@ -6,6 +6,9 @@ use ieee.numeric_std.all;
 use work.ctrl_common.all;
 
 entity capture is
+    generic (
+        C_CCD_NUM_ELEMENTS: integer
+    );
     port (
         i_clk: in std_logic;
         i_rst_n: in std_logic;
@@ -67,8 +70,6 @@ architecture behaviour of capture is
         S_STOPPING_2, S_STOPPING_3
     );
     signal r_state: t_state;
-
-    constant c_num_elements: integer := 364;
 begin
     r_ccd_start <= '1' when r_state = S_STARTING else '0';
     r_fifo_pl_wr <= r_dc_rdy and not r_dc_calib;
@@ -77,7 +78,7 @@ begin
     u_ccd: entity work.tcd1304(rtl)
         generic map(
             G_CLK_FREQ => 100_000_000,
-            G_NUM_ELEMENTS => c_num_elements
+            G_NUM_ELEMENTS => C_CCD_NUM_ELEMENTS
         )
         port map(
             i_clk => i_clk,

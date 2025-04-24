@@ -61,8 +61,8 @@ architecture bhv of tb_bofp1 is
     constant c_val_base: integer := 3000;
     constant c_dc_base: integer := 4000;
 
-    constant c_total_avg_n: integer := 3;
-    constant c_moving_avg_n: integer := 2;
+    constant c_total_avg_n: integer := 9;
+    constant c_moving_avg_n: integer := 3;
     constant c_moving_avg_n_sum: integer := c_moving_avg_n * 2 + 1;
 
     signal r_dc_calib: boolean := false;
@@ -154,6 +154,9 @@ begin
     clock_generator(r_clk, r_clkena, c_clk_period, "OSC Main");
 
     u_dut: entity work.bofp1(structural)
+        generic map(
+            C_CCD_NUM_ELEMENTS => c_ccd_pix_count
+        )
         port map(
             i_clk => r_clk,
             i_rst_n => r_rst_n,

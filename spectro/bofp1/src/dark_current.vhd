@@ -29,9 +29,11 @@ architecture behaviour of dark_current is
     signal r_wr_en: std_logic;
     signal r_rd_en: std_logic;
 
-    signal r_addr: unsigned(12 downto 0);
+    signal r_addr: unsigned(11 downto 0);
 
-    signal r_loaded: unsigned(15 downto 0);
+    signal r_calib: boolean;
+
+    signal r_loaded: std_logic_vector(15 downto 0);
     signal r_calced: unsigned(15 downto 0);
 begin
     u_ram: entity work.frame_ram
@@ -42,8 +44,19 @@ begin
             i_wr_en => r_wr_en,
             i_rd_en => r_rd_en,
             i_wr_data => i_data,
-            o_rd_data => std_logic_vector(r_loaded)
+            o_rd_data => r_loaded
         );
+
+    p_calib_hold: process(i_clk)
+    begin
+        if rising_edge(i_clk) then
+            if i_calib = '1' then
+                r_calib <= true;
+            elsif r_state = S_CALIB and i_en = '0' then
+                r_calib <= false;
+            end if;
+        end if;
+    end process p_calib_hold;
 
     -- Calibration is simply performed by writing a frame into memory with
     -- the light source disabled.
@@ -63,25 +76,25 @@ begin
         if rising_edge(i_clk) then
             if i_rst_n = '0' or r_state = S_IDLE then
                 r_addr <= (others => '0');
-            elsif r_state = S_LOAD or (r_state = S_CALIB and r_wr_en = '1') then
+            elsif r_state = S_READY or (r_state = S_CALIB and r_wr_en = '1') then
                 r_addr <= r_addr + 1;
             end if;
         end if;
     end process p_addr;
 
-    r_rd_en <= '1' when (r_state = S_LOAD) else '0';
+    r_rd_en <= '1' when (r_state = S_LOAD or r_state = S_IDLE) else '0';
 
     p_calc: process(i_clk)
     begin
         if rising_edge(i_clk) then
             set_err(o_errors, ERR_DC_UNDERFLOW, '0');
 
-            if r_state /= S_IDLE then
-                if r_loaded > unsigned(i_data) then
+            if r_state = S_CALC then
+                if unsigned(r_loaded) > unsigned(i_data) then
                     set_err(o_errors, ERR_DC_UNDERFLOW, '1');
                 end if;
 
-                r_calced <= unsigned(i_data) - r_loaded;
+                r_calced <= unsigned(i_data) - unsigned(r_loaded);
             end if;
         end if;
     end process p_calc;
@@ -96,40 +109,32 @@ begin
     p_state: process(i_clk)
     begin
         if rising_edge(i_clk) then
-            if i_rst_n = '0' then
+            if i_rst_n = '0' or i_en = '0' then
                 r_state <= S_IDLE;
             else
                 case r_state is
                     when S_IDLE =>
-                        if i_calib = '1' then
+                        if r_calib then
                             r_state <= S_CALIB;
-                        elsif i_en = '1' then
-                            r_state <= S_LOAD;
+                        elsif i_rdy = '1' then
+                            r_state <= S_CALC;
                         end if;
 
                     when S_CALIB =>
-                        if i_en = '0' then
-                            r_state <= S_IDLE;
-                        end if;
+                        -- Will be reset to IDLE when i_en is dropped
+                        null;
 
                     when S_LOAD =>
-                        -- Only needs one cycle
-                        r_state <= S_CALC;
+                        if i_rdy = '1' then
+                            r_state <= S_CALC;
+                        end if;
 
                     when S_CALC =>
-                        if i_rdy = '1' then
-                            r_state <= S_READY;
-                        end if;
+                        r_state <= S_READY;
 
                     when S_READY =>
-                        -- When busy falls to zero, all pixels have been
-                        -- processed and we can return to idle. Otherwise, we
-                        -- go back to processing another pixel.
-                        if i_en = '0' then
-                            r_state <= S_IDLE;
-                        else
-                            r_state <= S_LOAD;
-                        end if;
+                        -- Continue processing the next pixel
+                        r_state <= S_LOAD;
 
                     when others => null;
                 end case;

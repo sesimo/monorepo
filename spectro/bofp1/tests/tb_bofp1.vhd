@@ -403,10 +403,8 @@ begin
                 calc_moving_avg_val(dc, dc_moving_avg_window, dc);
 
                 calc_total_avg_val(pl_val, pl_cycles, pl_noise);
-                report "total: " & to_hstring(pl_val) & ", cycles: " & integer'image(pl_cycles) & ", noise" & integer'image(pl_noise) & ", uh: " & integer'image(r_read_frame_count);
                 calc_moving_avg_val(pl_val, pl_moving_avg_window, pl_val);
 
-                report "pl: " & to_hstring(pl_val) & ", dc: " & to_hstring(dc);
                 pl_val := pl_val - dc;
 
                 if idx < c_ccd_pix_count - c_moving_avg_n_sum then

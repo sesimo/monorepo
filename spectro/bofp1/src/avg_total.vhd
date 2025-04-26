@@ -12,7 +12,7 @@ entity avg_total is
         i_en: in std_logic;
         i_rdy: in std_logic;
         i_data: in std_logic_vector(15 downto 0);
-        i_n: in std_logic_vector(4 downto 0);
+        i_n: in std_logic_vector(3 downto 0);
         o_busy: out std_logic;
         o_rdy: out std_logic;
         o_data: out std_logic_vector(15 downto 0)
@@ -20,19 +20,22 @@ entity avg_total is
 end entity avg_total;
 
 architecture behaviour of avg_total is
-    type t_state is (S_FIRST, S_NORMAL, S_LAST);
-    signal r_state: t_state;
+    type t_frame_state is (S_FRAME_IDLE, S_FIRST, S_NORMAL, S_LAST);
+    signal r_frame_state: t_frame_state;
+
+    type t_pix_state is (S_PIX_IDLE, S_CALC_ADD, S_CALC_DIV, S_STORE, S_LOAD, S_READY);
+    signal r_pix_state: t_pix_state;
 
     signal r_en_fall: std_logic;
+    signal r_en_fall_sync: std_logic;
     signal r_cnt_rst_n: std_logic;
-    signal r_cnt_fall_roll: std_logic;
+    signal r_cnt_roll: std_logic;
+    signal r_cnt_roll_sync: std_logic;
 
     signal r_rd_en: std_logic;
     signal r_wr_en: std_logic;
 
-    signal r_rdy1: std_logic;
-    signal r_rdy2: std_logic;
-
+    signal r_val_add: unsigned(20 downto 0);
     signal r_val: unsigned(20 downto 0);
     signal r_memval: std_logic_vector(20 downto 0);
     signal r_addr: unsigned(11 downto 0);
@@ -55,7 +58,7 @@ begin
         );
 
     -- Don't count when not in normal mode
-    r_cnt_rst_n <= '0' when (i_rst_n = '0' or r_state /= S_NORMAL) else '1';
+    r_cnt_rst_n <= '0' when (i_rst_n = '0' or r_frame_state /= S_NORMAL) else '1';
 
     u_cnt_fall: entity work.counter
         generic map(
@@ -66,7 +69,7 @@ begin
             i_rst_n => r_cnt_rst_n,
             i_en => r_en_fall,
             i_max => std_logic_vector(unsigned(i_n) - 2),
-            o_roll => r_cnt_fall_roll
+            o_roll => r_cnt_roll
         );
 
     -- Detect falling edge of enable signal. This is used to detect the end
@@ -93,20 +96,21 @@ begin
             r_loaded <= true;
             r_rd_en <= '0';
 
-            if r_state = S_FIRST then
+            if r_frame_state = S_FRAME_IDLE then
                 r_loaded <= false;
-            elsif not r_loaded or r_rdy2 = '1' then
+            elsif not r_loaded or r_pix_state = S_LOAD then
                 r_rd_en <= '1';
             end if;
         end if;
     end process p_load;
 
+    -- Write to memory, unless in the last state
     p_store: process(i_clk)
     begin
         if rising_edge(i_clk) then
             r_wr_en <= '0';
 
-            if r_rdy1 = '1' and r_state /= S_LAST then
+            if r_pix_state = S_STORE and r_frame_state /= S_LAST then
                 r_wr_en <= '1';
             end if;
         end if;
@@ -118,88 +122,150 @@ begin
     p_addr: process(i_clk)
     begin
         if rising_edge(i_clk) then
-            if i_en = '0' then
+            if i_rst_n = '0' then
                 r_addr <= (others => '0');
-            elsif r_rdy2 = '1' then
-                r_addr <= r_addr + 1;
+            elsif r_pix_state = S_LOAD then
+                if i_en = '0' then
+                    r_addr <= (others => '0');
+                else
+                    r_addr <= r_addr + 1;
+                end if;
             end if;
         end if;
     end process p_addr;
 
-    p_calc: process(i_clk)
+    -- Add to the sum
+    p_calc_add: process(i_clk)
     begin
         if rising_edge(i_clk) then
-            if i_rdy = '1' then
-                case r_state is
+            if r_pix_state = S_CALC_ADD and i_rdy = '1' then
+                case r_frame_state is
                     when S_FIRST =>
-                        r_val <= resize(unsigned(i_data), r_val'length);
+                        r_val_add <= resize(unsigned(i_data), r_val_add'length);
 
-                    when S_NORMAL =>
-                        r_val <= resize(unsigned(r_memval) + unsigned(i_data),
-                                 r_val'length);
+                    when S_NORMAL | S_LAST =>
+                        r_val_add <= resize(
+                                     unsigned(r_memval) + unsigned(i_data),
+                                     r_val_add'length);
 
-                    when S_LAST =>
-                        r_val <= resize(
-                                 (unsigned(r_memval) + unsigned(i_data))
-                                 / unsigned(i_n),
-                                 r_val'length);
+                    when others => null;
                 end case;
             end if;
         end if;
-    end process p_calc;
+    end process p_calc_add;
 
-    p_rdy: process(i_clk)
+    -- Divide the sum by N, if in the last state
+    p_calc_div: process(i_clk)
     begin
         if rising_edge(i_clk) then
-            o_rdy <= '0';
-            r_rdy1 <= i_rdy;
-            r_rdy2 <= r_rdy1;
+            if r_pix_state = S_CALC_DIV then
+                case r_frame_state is
+                    when S_FIRST | S_NORMAL =>
+                        r_val <= r_val_add;
 
-            if r_state = S_LAST then
-                o_rdy <= i_rdy;
+                    when S_LAST =>
+                        r_val <= const_div(r_val_add, unsigned(i_n), 61);
+
+                    when others => null;
+                end case;
             end if;
         end if;
-    end process p_rdy;
+    end process p_calc_div;
 
-    -- Busy when enable=1, or in the cycle enable is falling, or when in
-    -- any state but the first.
-    p_busy: process(i_clk)
-        variable busy: boolean;
-    begin
-        if rising_edge(i_clk) then
-            busy := i_en = '1' or r_en_fall = '1' or r_state /= S_FIRST;
-            o_busy <= '1' when busy else '0';
-        end if;
-    end process p_busy;
-
-    -- Handle state changes in between frames
-    p_state: process(i_clk)
+    p_pix_state: process(i_clk)
     begin
         if rising_edge(i_clk) then
             if i_rst_n = '0' then
-                r_state <= S_FIRST;
+                r_pix_state <= S_CALC_ADD;
             else
-                case r_state is
+                case r_pix_state is
+                    when S_PIX_IDLE =>
+                        if i_en = '1' then
+                            r_pix_state <= S_CALC_ADD;
+                        end if;
+                    when S_CALC_ADD =>
+                        if i_rdy = '1' then
+                            r_pix_state <= S_CALC_DIV;
+                        end if;
+
+                    when S_CALC_DIV =>
+                        r_pix_state <= S_STORE;
+
+                    when S_STORE =>
+                        r_pix_state <= S_LOAD;
+
+                    when S_LOAD =>
+                        r_pix_state <= S_READY;
+
+                    when S_READY =>
+                        r_pix_state <= S_PIX_IDLE;
+
+                end case;
+            end if;
+        end if;
+    end process p_pix_state;
+
+    -- Synchronise the enable signals needed to transition between frame
+    -- states. This is done because we only want to transition when the
+    -- pixel is in the ready state.
+    p_ready_sync: process(i_clk)
+    begin
+        if rising_edge(i_clk) then
+            if i_rst_n = '0' then
+                r_en_fall_sync <= '0';
+                r_cnt_roll_sync <= '0';
+            else
+                if r_pix_state = S_READY then
+                    r_en_fall_sync <= '0';
+                    r_cnt_roll_sync <= '0';
+                end if;
+
+                if r_en_fall = '1' then
+                    r_en_fall_sync <= '1';
+                end if;
+
+                if r_cnt_roll = '1' then
+                    r_cnt_roll_sync <= '1';
+                end if;
+            end if;
+        end if;
+    end process p_ready_sync;
+
+    -- Handle state changes in between frames
+    p_frame_state: process(i_clk)
+    begin
+        if rising_edge(i_clk) then
+            if i_rst_n = '0' then
+                r_frame_state <= S_FRAME_IDLE;
+            else
+                case r_frame_state is
+                    when S_FRAME_IDLE =>
+                        if i_en = '1' then
+                            r_frame_state <= S_FIRST;
+                        end if;
+
                     when S_FIRST =>
-                        if r_en_fall = '1' then
-                            r_state <= S_NORMAL;
+                        if r_pix_state = S_READY and r_en_fall_sync = '1' then
+                            r_frame_state <= S_NORMAL;
                         end if;
 
                     when S_NORMAL =>
-                        if r_cnt_fall_roll = '1' then
-                            r_state <= S_LAST;
+                        if r_pix_state = S_READY and r_cnt_roll_sync = '1' then
+                            r_frame_state <= S_LAST;
                         end if;
 
                     when S_LAST =>
-                        if r_en_fall = '1' then
-                            r_state <= S_FIRST;
+                        if r_pix_state = S_READY and r_en_fall_sync = '1' then
+                            r_frame_state <= S_FRAME_IDLE;
                         end if;
 
                 end case;
             end if;
         end if;
-    end process p_state;
+    end process p_frame_state;
 
     o_data <= std_logic_vector(r_val(o_data'range));
+    o_rdy <= '1' when r_frame_state = S_LAST and r_pix_state = S_READY else '0';
+    o_busy <= '1' when r_frame_state /= S_FRAME_IDLE else '0';
 
 end architecture behaviour;

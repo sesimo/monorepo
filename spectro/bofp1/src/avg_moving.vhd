@@ -11,7 +11,7 @@ entity avg_moving is
         i_rst_n: in std_logic;
         i_en: in std_logic;
         i_rdy: in std_logic;
-        i_n: in std_logic_vector(7 downto 0);
+        i_n: in std_logic_vector(3 downto 0);
         i_data: in std_logic_vector(15 downto 0);
         o_busy: out std_logic;
         o_rdy: out std_logic;
@@ -37,7 +37,6 @@ architecture behaviour of avg_moving is
     signal r_cnt: std_logic_vector(r_n_total'range);
     signal r_cnt_rolled: std_logic;
     signal r_cnt_rst_n: std_logic;
-
 begin
 
     u_fifo: entity work.window_fifo
@@ -133,7 +132,7 @@ begin
     begin
         if rising_edge(i_clk) then
             if i_rdy = '1' then
-                val := r_sum / unsigned(r_n_total);
+                val := const_div(r_sum, r_n_total, 64);
                 o_data <= std_logic_vector(resize(val, o_data'length));
             end if;
         end if;

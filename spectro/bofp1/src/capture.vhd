@@ -66,10 +66,13 @@ architecture behaviour of capture is
     signal r_fifo_pl_wr: std_logic;
 
     type t_state is (
-        S_IDLE, S_STARTING, S_WAITING, S_RUNNING, S_STOPPING_1,
-        S_STOPPING_2, S_STOPPING_3
+        S_IDLE, S_STARTING, S_WAITING, S_RUNNING,
+        S_STOP_WAIT, S_STOPPING
     );
     signal r_state: t_state;
+
+    signal r_stop_buf: std_logic_vector(5 downto 0);
+    signal r_stop: std_logic;
 begin
     r_ccd_start <= '1' when r_state = S_STARTING else '0';
     r_fifo_pl_wr <= r_dc_rdy and not r_dc_calib;
@@ -205,6 +208,22 @@ begin
         end if;
     end process p_calib;
 
+    -- Wait a number of cycles to allow the pipeline to complete before
+    -- checking if the total average stage remains active. If it does, we
+    -- need to repeat capturing.
+    p_stop_wait: process(i_clk)
+    begin
+        if rising_edge(i_clk) then
+            if r_state /= S_STOP_WAIT then
+                r_stop_buf <= (others => '0');
+            else
+                r_stop_buf <= r_stop_buf(r_stop_buf'high-1 downto 0) & '1';
+            end if;
+        end if;
+    end process p_stop_wait;
+
+    r_stop <= r_stop_buf(r_stop_buf'high);
+
     p_state: process(i_clk)
     begin
         if rising_edge(i_clk) then
@@ -227,18 +246,15 @@ begin
 
                     when S_RUNNING =>
                         if r_ccd_busy = '0' then
-                            r_state <= S_STOPPING_1;
+                            r_state <= S_STOP_WAIT;
                         end if;
 
-                    when S_STOPPING_1 =>
-                        r_state <= S_STOPPING_2;
+                    when S_STOP_WAIT =>
+                        if r_stop = '1' then
+                            r_state <= S_STOPPING;
+                        end if;
 
-                    when S_STOPPING_2 =>
-                        r_state <= S_STOPPING_3;
-
-                    -- Delay checking as it may take time for the busy signal
-                    -- of the total average stage to fall.
-                    when S_STOPPING_3 =>
+                    when S_STOPPING =>
                         if r_total_avg_busy = '1' then
                             r_state <= S_STARTING;
                         elsif r_dc_busy = '0' then

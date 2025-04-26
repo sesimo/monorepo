@@ -36,6 +36,7 @@ architecture behaviour of ctrl is
 
     signal r_out: std_logic_vector(15 downto 0);
     signal r_out_shf: std_logic_vector(7 downto 0);
+    signal r_out_rd: std_logic_vector(15 downto 0);
     signal r_in_buf: std_logic_vector(7 downto 0);
 
     -- Streaming from FIFO
@@ -137,17 +138,15 @@ begin
                 r_out <= i_fifo_pl_data;
             end if;
         else
-            r_out <= (others => '0');
+            r_out <= r_out_rd;
         end if;
     end process p_out;
 
     -- Load current part of the data that is to be shifted out
-    p_out_shf: process(i_clk)
+    p_out_shf: process(all)
     begin
-        if rising_edge(i_clk) then
-            if r_rst_n_mux /= '0' then
-                r_out_shf <= cur_shf_range(r_out, unsigned(r_shift_count));
-            end if;
+        if r_shift_count /= (r_shift_count'range => 'U') then
+            r_out_shf <= cur_shf_range(r_out, unsigned(r_shift_count));
         end if;
     end process p_out_shf;
 
@@ -221,16 +220,26 @@ begin
         end if;
     end process p_stream;
 
-    -- Read registere value
+    -- Read register value
     p_read: process(i_clk)
         variable is_read: boolean;
+        variable reg: t_reg;
     begin
         if rising_edge(i_clk) then
             is_read := not is_write(r_reg_raw);
 
-            if i_rst_n = '0' then
-            elsif r_reg_rdy = '1' and is_read then
-                -- Dummy
+            if i_rst_n /= '0' and r_reg_rdy = '1' and is_read then
+                reg := parse_reg(r_reg_raw);
+
+                case reg is
+                    when REG_SHDIV1 | REG_SHDIV2 | REG_SHDIV3
+                         | REG_PRC_CONTROL | REG_TOTAL_AVG_N
+                         | REG_MOVING_AVG_N
+                         | REG_STATUS =>
+                        r_out_rd(7 downto 0) <= get_reg(io_regmap, reg);
+
+                    when others => null;
+                end case;
             end if;
         end if;
     end process p_read;

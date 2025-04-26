@@ -127,7 +127,7 @@ begin
         port map(
             i_clk => i_clk,
             i_rst_n => i_rst_n,
-            i_n => get_reg(i_regmap, REG_TOTAL_AVG_N)(4 downto 0),
+            i_n => get_reg(i_regmap, REG_TOTAL_AVG_N)(3 downto 0),
             i_data => r_ccd_data,
             i_en => r_ccd_busy,
             i_rdy => r_ccd_rdy,
@@ -140,7 +140,7 @@ begin
         port map(
             i_clk => i_clk,
             i_rst_n => i_rst_n,
-            i_n => get_reg(i_regmap, REG_MOVING_AVG_N),
+            i_n => get_reg(i_regmap, REG_MOVING_AVG_N)(3 downto 0),
             i_en => r_total_avg_busy,
             i_rdy => r_total_avg_rdy,
             i_data => r_total_avg_data,

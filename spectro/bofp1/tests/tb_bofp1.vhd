@@ -21,7 +21,7 @@ end entity tb_bofp1;
 
 architecture bhv of tb_bofp1 is
     signal r_clk:  std_logic;
-    signal r_rst_n: std_logic;
+    signal r_rst_n: std_logic := '0';
 
     signal r_ccd_sh:  std_logic;
     signal r_ccd_mclk:  std_logic;
@@ -587,8 +587,6 @@ begin
 
         log(ID_LOG_HDR, "Simulation setup", c_scope);
         ------------------------------------------------------------------------
-        r_rst_n <= '0';
-
         -- Setup SPI
         r_spi_conf.CPOL <= '0';
         r_spi_conf.CPHA <= '1';

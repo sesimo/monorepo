@@ -37,8 +37,8 @@ entity bofp1 is
 end entity bofp1;
 
 architecture structural of bofp1 is
-    signal r_rst: std_logic;
-    signal r_rst_n: std_logic;
+    signal r_rst: std_logic := '1';
+    signal r_rst_n: std_logic := '0';
     signal r_rst_en: std_logic;
     signal r_rst_gen: std_logic;
 

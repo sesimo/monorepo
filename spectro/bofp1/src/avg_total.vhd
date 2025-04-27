@@ -39,6 +39,8 @@ architecture behaviour of avg_total is
     signal r_val: unsigned(20 downto 0);
     signal r_memval: std_logic_vector(20 downto 0);
     signal r_addr: unsigned(11 downto 0);
+    signal r_single: boolean;
+    signal r_double: boolean;
 
     signal r_loaded: boolean;
 begin
@@ -57,8 +59,26 @@ begin
             o_rd_data => r_memval
         );
 
-    -- Don't count when not in normal mode
-    r_cnt_rst_n <= '0' when (i_rst_n = '0' or r_frame_state /= S_NORMAL) else '1';
+    -- Don't count when in idle
+    r_cnt_rst_n <= '0' when (i_rst_n = '0' or r_frame_state = S_FRAME_IDLE) else '1';
+
+    p_n_cases: process(i_clk)
+    begin
+        if rising_edge(i_clk) then
+            r_single <= false;
+            r_double <= false;
+
+            if i_n /= (i_n'range => 'U') then
+                if unsigned(i_n) = 1 then
+                    r_single <= true;
+                elsif unsigned(i_n) = 2 then
+                    r_double <= true;
+                end if;
+            else
+                r_single <= true;
+            end if;
+        end if;
+    end process p_n_cases;
 
     u_cnt_fall: entity work.counter
         generic map(
@@ -68,7 +88,7 @@ begin
             i_clk => i_clk,
             i_rst_n => r_cnt_rst_n,
             i_en => r_en_fall,
-            i_max => std_logic_vector(unsigned(i_n) - 2),
+            i_max => std_logic_vector(unsigned(i_n) - 1),
             o_roll => r_cnt_roll
         );
 
@@ -110,7 +130,7 @@ begin
         if rising_edge(i_clk) then
             r_wr_en <= '0';
 
-            if r_pix_state = S_STORE and r_frame_state /= S_LAST then
+            if r_pix_state = S_STORE and r_frame_state /= S_LAST and not r_single then
                 r_wr_en <= '1';
             end if;
         end if;
@@ -246,7 +266,13 @@ begin
 
                     when S_FIRST =>
                         if r_pix_state = S_READY and r_en_fall_sync = '1' then
-                            r_frame_state <= S_NORMAL;
+                            if r_single then
+                                r_frame_state <= S_FRAME_IDLE;
+                            elsif r_double then
+                                r_frame_state <= S_LAST;
+                            else
+                                r_frame_state <= S_NORMAL;
+                            end if;
                         end if;
 
                     when S_NORMAL =>
@@ -264,8 +290,22 @@ begin
         end if;
     end process p_frame_state;
 
+    p_rdy: process(all)
+    begin
+        if r_pix_state = S_READY then
+            if r_frame_state = S_LAST then
+                o_rdy <= '1';
+            elsif r_frame_state = S_FIRST and r_single then
+                o_rdy <= '1';
+            else
+                o_rdy <= '0';
+            end if;
+        else
+            o_rdy <= '0';
+        end if;
+    end process p_rdy;
+
     o_data <= std_logic_vector(r_val(o_data'range));
-    o_rdy <= '1' when r_frame_state = S_LAST and r_pix_state = S_READY else '0';
     o_busy <= '1' when r_frame_state /= S_FRAME_IDLE else '0';
 
 end architecture behaviour;

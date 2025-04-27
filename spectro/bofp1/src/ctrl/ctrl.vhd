@@ -145,7 +145,9 @@ begin
     -- Load current part of the data that is to be shifted out
     p_out_shf: process(all)
     begin
-        if r_shift_count /= (r_shift_count'range => 'U') then
+        if i_rst_n = '0' then
+            r_out_shf <= (others => '0');
+        else
             r_out_shf <= cur_shf_range(r_out, unsigned(r_shift_count));
         end if;
     end process p_out_shf;

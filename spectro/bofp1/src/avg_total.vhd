@@ -68,14 +68,14 @@ begin
             r_single <= false;
             r_double <= false;
 
-            if i_n /= (i_n'range => 'U') then
+            if i_rst_n = '0' then
+                r_single <= true;
+            else
                 if unsigned(i_n) = 1 then
                     r_single <= true;
                 elsif unsigned(i_n) = 2 then
                     r_double <= true;
                 end if;
-            else
-                r_single <= true;
             end if;
         end if;
     end process p_n_cases;

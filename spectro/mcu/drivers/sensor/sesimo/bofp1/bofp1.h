@@ -44,6 +44,8 @@ struct bofp1_cfg {
         uint8_t clkdiv;
         uint32_t integration_time_dt;
         uint32_t clock_frequency;
+        uint8_t moving_avg_n_dt;
+        uint8_t total_avg_n_dt;
 
         struct spi_dt_spec bus;
         struct gpio_dt_spec busy_gpios;
@@ -52,6 +54,11 @@ struct bofp1_cfg {
 
 struct bofp1_data {
         uint8_t shdiv[3];
+        uint8_t total_avg_n;
+        uint8_t moving_avg_n;
+
+        /* Status on FPGA */
+        uint8_t status_raw;
 
         struct gpio_callback busy_fall_cb;
         struct gpio_callback fifo_w_cb;

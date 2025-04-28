@@ -115,38 +115,55 @@ static void bofp1_rtio_err(struct rtio *r, const struct rtio_sqe *sqe,
         ARG_UNUSED(sqe);
 
         uint8_t reg_reset[2];
-        uint8_t reg_conf[6];
+        uint8_t reg_conf_sh[6];
+        uint8_t reg_conf_cap[4];
         const struct device *dev = dev_arg;
         struct bofp1_data *data = dev->data;
         struct rtio_sqe *reset;
-        struct rtio_sqe *conf;
+        struct rtio_sqe *conf_sh;
+        struct rtio_sqe *conf_cap;
         struct rtio_sqe *finish;
 
         reset = rtio_sqe_acquire(data->rtio_ctx);
-        conf = rtio_sqe_acquire(data->rtio_ctx);
+        conf_sh = rtio_sqe_acquire(data->rtio_ctx);
+        conf_cap = rtio_sqe_acquire(data->rtio_ctx);
         finish = rtio_sqe_acquire(data->rtio_ctx);
 
         LOG_INF("resetting FPGA");
 
         /* The FPGA can handle two consecutive commands, but it requires
          * some clock cycles to perform the reset and we should therefore split
-         * the transaction into two. The delay on the micro between these two
+         * the transaction into two. The delay on the MCU between these two
          * packets will be more than enough. */
         reg_reset[0] = BOFP1_WRITE_REG(BOFP1_REG_RESET); /* Reset */
         reg_reset[1] = 0;
-        reg_conf[0] = BOFP1_WRITE_REG(BOFP1_REG_CCD_SH1); /* Set SH div */
-        reg_conf[1] = data->shdiv[0];
-        reg_conf[2] = BOFP1_WRITE_REG(BOFP1_REG_CCD_SH2); /* Set SH div */
-        reg_conf[3] = data->shdiv[1];
-        reg_conf[4] = BOFP1_WRITE_REG(BOFP1_REG_CCD_SH3); /* Set SH div */
-        reg_conf[5] = data->shdiv[2];
+
+        /* Tiny writes are hard-coded capped at 7 bytes, so the
+         * transaction for configuration needs to be split into two
+         * transactions. */
+        reg_conf_sh[0] = BOFP1_WRITE_REG(BOFP1_REG_CCD_SH1); /* Set SH div */
+        reg_conf_sh[1] = data->shdiv[0];
+        reg_conf_sh[2] = BOFP1_WRITE_REG(BOFP1_REG_CCD_SH2); /* Set SH div */
+        reg_conf_sh[3] = data->shdiv[1];
+        reg_conf_sh[4] = BOFP1_WRITE_REG(BOFP1_REG_CCD_SH3); /* Set SH div */
+        reg_conf_sh[5] = data->shdiv[2];
+
+        /* Configure pipeline-specific registers */
+        reg_conf_cap[0] = BOFP1_WRITE_REG(BOFP1_REG_MOVING_AVG_N);
+        reg_conf_cap[1] = data->moving_avg_n;
+        reg_conf_cap[2] = BOFP1_WRITE_REG(BOFP1_REG_TOTAL_AVG_N);
+        reg_conf_cap[3] = data->total_avg_n;
+
         rtio_sqe_prep_tiny_write(reset, data->iodev_bus, RTIO_PRIO_NORM,
                                  reg_reset, sizeof(reg_reset), NULL);
-        rtio_sqe_prep_tiny_write(conf, data->iodev_bus, RTIO_PRIO_NORM,
-                                 reg_conf, sizeof(reg_conf), NULL);
+        rtio_sqe_prep_tiny_write(conf_sh, data->iodev_bus, RTIO_PRIO_NORM,
+                                 reg_conf_sh, sizeof(reg_conf_sh), NULL);
+        rtio_sqe_prep_tiny_write(conf_cap, data->iodev_bus, RTIO_PRIO_NORM,
+                                 reg_conf_cap, sizeof(reg_conf_cap), NULL);
 
         reset->flags = RTIO_SQE_CHAINED;
-        conf->flags = RTIO_SQE_CHAINED;
+        conf_sh->flags = RTIO_SQE_CHAINED;
+        conf_cap->flags = RTIO_SQE_CHAINED;
 
         rtio_sqe_prep_callback(finish, bofp1_rtio_finish, (void *)dev, NULL);
 

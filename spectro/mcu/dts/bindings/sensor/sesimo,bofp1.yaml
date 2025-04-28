@@ -44,3 +44,17 @@ properties:
       FIFO watermark GPIO (more than 256 elements in the FIFO)
     type: phandle-array
     required: true
+
+  total-avg-n:
+    type: int
+    default: 1
+    description: |
+      Number of frames to capture before returning an average of all of them
+      as a single frame.
+
+  moving-avg-n:
+    type: int
+    default: 1
+    description: |
+      Number of neighbours (on each side) to produce a moving average for each
+      of the pixels in a frame.

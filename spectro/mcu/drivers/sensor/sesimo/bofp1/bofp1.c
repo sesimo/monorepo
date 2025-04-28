@@ -129,6 +129,58 @@ exit:
         return status;
 }
 
+static int bofp1_set_reg(const struct device *dev, uint8_t reg, uint8_t val)
+{
+        int status;
+        uint8_t check;
+
+        status = bofp1_write_reg(dev, reg, val);
+        if (status != 0) {
+                return status;
+        }
+
+        status = bofp1_read_reg(dev, reg, &check);
+        if (status != 0) {
+                return status;
+        } else if (check != val) {
+                LOG_ERR("Unable to set register; returned value did not match "
+                        "desired value");
+                return -EIO;
+        }
+
+        LOG_DBG("set register %d to %d", reg, val);
+
+        return 0;
+}
+
+static int bofp1_set_moving_avg_n(const struct device *dev, uint8_t n)
+{
+        int status = 0;
+        struct bofp1_data *data = dev->data;
+
+        K_SPINLOCK(&data->lock)
+        {
+                status = bofp1_set_reg(dev, BOFP1_REG_MOVING_AVG_N, n);
+                data->moving_avg_n = status == 0 ? n : 0;
+        }
+
+        return status;
+}
+
+static int bofp1_set_total_avg_n(const struct device *dev, uint8_t n)
+{
+        int status = 0;
+        struct bofp1_data *data = dev->data;
+
+        K_SPINLOCK(&data->lock)
+        {
+                status = bofp1_set_reg(dev, BOFP1_REG_TOTAL_AVG_N, n);
+                data->total_avg_n = status == 0 ? n : 0;
+        }
+
+        return status;
+}
+
 static int bofp1_reset(const struct device *dev)
 {
         return bofp1_write_reg(dev, BOFP1_REG_RESET, 0);
@@ -137,13 +189,21 @@ static int bofp1_reset(const struct device *dev)
 static int bofp1_attr_get(const struct device *dev, enum sensor_channel chan,
                           enum sensor_attribute attr, struct sensor_value *val)
 {
+        struct bofp1_data *data = dev->data;
+
         if (chan != SENSOR_CHAN_VOLTAGE) {
                 return -EINVAL;
         }
 
-        switch (attr) {
+        switch ((enum sensor_attr_bofp1)attr) {
         case SENSOR_ATTR_BOFP1_INTEGRATION:
                 val->val1 = bofp1_integration_time(dev);
+                break;
+        case SENSOR_ATTR_BOFP1_MOVING_AVG_N:
+                val->val1 = data->moving_avg_n;
+                break;
+        case SENSOR_ATTR_BOFP1_TOTAL_AVG_N:
+                val->val1 = data->total_avg_n;
                 break;
         default:
                 return -EINVAL;
@@ -160,9 +220,13 @@ static int bofp1_attr_set(const struct device *dev, enum sensor_channel chan,
                 return -EINVAL;
         }
 
-        switch (attr) {
+        switch ((enum sensor_attr_bofp1)attr) {
         case SENSOR_ATTR_BOFP1_INTEGRATION:
                 return bofp1_set_integration_time(dev, (uint32_t)val->val1);
+        case SENSOR_ATTR_BOFP1_MOVING_AVG_N:
+                return bofp1_set_moving_avg_n(dev, (uint8_t)val->val1);
+        case SENSOR_ATTR_BOFP1_TOTAL_AVG_N:
+                return bofp1_set_total_avg_n(dev, (uint8_t)val->val1);
         default:
                 return -EINVAL;
         }
@@ -346,6 +410,16 @@ static int bofp1_init(const struct device *dev)
                 return status;
         }
 
+        status = bofp1_set_total_avg_n(dev, cfg->total_avg_n_dt);
+        if (status != 0) {
+                return status;
+        }
+
+        status = bofp1_set_moving_avg_n(dev, cfg->moving_avg_n_dt);
+        if (status != 0) {
+                return status;
+        }
+
         return 0;
 }
 
@@ -365,6 +439,8 @@ static int bofp1_init(const struct device *dev)
                 .fifo_w_gpios =                                                \
                         GPIO_DT_SPEC_INST_GET(inst_, fifo_wmark_gpios),        \
                 .clock_frequency = DT_INST_PROP(inst_, clock_frequency),       \
+                .moving_avg_n_dt = DT_INST_PROP(inst_, moving_avg_n),          \
+                .total_avg_n_dt = DT_INST_PROP(inst_, total_avg_n),            \
         };                                                                     \
         static struct bofp1_data bofp1_data_##inst_##__ = {                    \
                 .iodev_bus = &bofp1_iodev_##inst_##__,                         \

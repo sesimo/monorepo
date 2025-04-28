@@ -6,18 +6,29 @@
 #include <zephyr/drivers/spi.h>
 #include <zephyr/drivers/gpio.h>
 
-#define BOFP1_REG_OFFSET (4)
+#define BOFP1_REG_OFFSET (0)
 #define BOFP1_REG_BIT_WR (1 << 7)
 
 #define BOFP1_READ_REG(r)  (r << BOFP1_REG_OFFSET)
 #define BOFP1_WRITE_REG(r) ((r << BOFP1_REG_OFFSET) | BOFP1_REG_BIT_WR)
 
-#define BOFP1_REG_STREAM  (0x0) /* Stream for entirety of transmission */
-#define BOFP1_REG_SAMPLE  (0x1) /* Begin sample. Write only */
-#define BOFP1_REG_RESET   (0x2) /* Reset */
-#define BOFP1_REG_CCD_SH1 (0x3) /* 24bit SH frequncy (clock div) MSB byte 0 */
-#define BOFP1_REG_CCD_SH2 (0x4) /* 24bit SH frequncy (clock div) MSB byte 1 */
-#define BOFP1_REG_CCD_SH3 (0x5) /* 24bit SH frequncy (clock div) MSB byte 2 */
+/* Stream raw data for entirety of transmission */
+#define BOFP1_REG_STREAM       (0x0)
+/* Stream pipeline data for entirety of transmission */
+#define BOFP1_REG_STREAM_PL    (0x1)
+#define BOFP1_REG_SAMPLE       (0x2) /* Begin sample. Write only */
+#define BOFP1_REG_RESET        (0x3) /* Reset */
+#define BOFP1_REG_CCD_SH1      (0x4) /* 24bit SH freq (clock div) MSB byte 0 */
+#define BOFP1_REG_CCD_SH2      (0x5) /* 24bit SH freq (clock div) MSB byte 1 */
+#define BOFP1_REG_CCD_SH3      (0x6) /* 24bit SH freq (clock div) MSB byte 2 */
+#define BOFP1_REG_PRCCTRL      (0x7) /* Processing control register */
+#define BOFP1_REG_MOVING_AVG_N (0x8) /* Number of neighbours for moving avg */
+#define BOFP1_REG_TOTAL_AVG_N  (0x9) /* Number of frames for total average */
+#define BOFP1_REG_STATUS       (0xa) /* Status register */
+#define BOFP1_REG_DC_CALIB     (0xb) /* Trigger DC calibration*/
+
+#define BOFP1_PRC_WMARK_SRC (0x0)
+#define BOFP1_PRC_BUSY_SRC  (0x1)
 
 #define BOFP1_NUM_ELEMENTS_REAL        (3648)
 #define BOFP1_NUM_ELEMENTS_DUMMY_LEFT  (32)

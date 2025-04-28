@@ -10,9 +10,17 @@ LOG_MODULE_DECLARE(sesimo_bofp1);
 
 #define READ_CHUNK_SIZE (256 * sizeof(uint16_t))
 
-static inline size_t bofp1_frame_size(void)
+static inline size_t bofp1_frame_size(const struct device *dev)
 {
-        return BOFP1_NUM_ELEMENTS_TOTAL * sizeof(uint16_t);
+        struct bofp1_data *data = dev->data;
+        size_t ret;
+
+        ret = BOFP1_NUM_ELEMENTS_TOTAL;
+        if (bofp1_get_prc(dev, BOFP1_PRC_MOVAVG_ENA)) {
+                ret -= data->moving_avg_n * 2;
+        }
+
+        return ret * sizeof(uint16_t);
 }
 
 static void bofp1_set_status(const struct device *dev, int status)
@@ -47,8 +55,9 @@ static void bofp1_submit_fetch(struct rtio_iodev_sqe *iodev_sqe)
                 return;
         }
 
-        status = rtio_sqe_rx_buf(iodev_sqe, bofp1_frame_size(),
-                                 bofp1_frame_size(), &data->wr_buf, &real_len);
+        status = rtio_sqe_rx_buf(iodev_sqe, bofp1_frame_size(dev),
+                                 bofp1_frame_size(dev), &data->wr_buf,
+                                 &real_len);
         if (status != 0) {
                 (void)bofp1_disable_read(dev);
                 atomic_clear_bit(&data->state, BOFP1_BUSY);
@@ -195,12 +204,12 @@ static void bofp1_data_read(const struct device *dev)
         key = k_spin_lock(&data->lock);
 
         index = data->wr_index;
-        if (index >= bofp1_frame_size()) {
+        if (index >= bofp1_frame_size(dev)) {
                 LOG_WRN("duplicate read detected");
                 goto exit;
         }
 
-        size = bofp1_frame_size() - index;
+        size = bofp1_frame_size(dev) - index;
         if (size > READ_CHUNK_SIZE) {
                 size = READ_CHUNK_SIZE;
 

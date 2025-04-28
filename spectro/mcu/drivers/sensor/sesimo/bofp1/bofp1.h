@@ -27,8 +27,11 @@
 #define BOFP1_REG_STATUS       (0xa) /* Status register */
 #define BOFP1_REG_DC_CALIB     (0xb) /* Trigger DC calibration*/
 
-#define BOFP1_PRC_WMARK_SRC (0x0)
-#define BOFP1_PRC_BUSY_SRC  (0x1)
+#define BOFP1_PRC_WMARK_SRC  (0x0)
+#define BOFP1_PRC_BUSY_SRC   (0x1)
+#define BOFP1_PRC_TOTAVG_ENA (0x2)
+#define BOFP1_PRC_MOVAVG_ENA (0x3)
+#define BOFP1_PRC_DC_ENA     (0x4)
 
 #define BOFP1_NUM_ELEMENTS_REAL        (3648)
 #define BOFP1_NUM_ELEMENTS_DUMMY_LEFT  (32)
@@ -46,6 +49,9 @@ struct bofp1_cfg {
         uint32_t clock_frequency;
         uint8_t moving_avg_n_dt;
         uint8_t total_avg_n_dt;
+        bool totavg_dt;
+        bool dc_dt;
+        bool movavg_dt;
 
         struct spi_dt_spec bus;
         struct gpio_dt_spec busy_gpios;
@@ -56,6 +62,8 @@ struct bofp1_data {
         uint8_t shdiv[3];
         uint8_t total_avg_n;
         uint8_t moving_avg_n;
+
+        uint8_t prc;
 
         /* Status on FPGA */
         uint8_t status_raw;
@@ -91,6 +99,8 @@ int bofp1_write_reg(const struct device *dev, uint8_t addr, uint8_t value);
 int bofp1_stream(const struct device *dev, void *data, size_t size);
 
 int bofp1_read_reg(const struct device *dev, uint8_t addr, uint8_t *value);
+
+uint8_t bofp1_get_prc(const struct device *dev, unsigned int bit);
 
 void bofp1_submit(const struct device *dev, struct rtio_iodev_sqe *sqe);
 

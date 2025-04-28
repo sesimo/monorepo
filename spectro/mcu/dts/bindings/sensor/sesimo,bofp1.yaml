@@ -45,6 +45,20 @@ properties:
     type: phandle-array
     required: true
 
+  dark-current:
+    type: boolean
+    description: Remove dark current from sample
+  
+  total-avg:
+    type: boolean
+    description: |
+      Produce one sample from the average of multiple continous samples
+
+  moving-avg:
+    type: boolean
+    description: |
+      Use a moving average window for smoothing each pixel in a sample
+
   total-avg-n:
     type: int
     default: 1

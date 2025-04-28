@@ -181,6 +181,33 @@ static int bofp1_set_total_avg_n(const struct device *dev, uint8_t n)
         return status;
 }
 
+static int bofp1_set_prc(const struct device *dev, bool dc_ena, bool movavg_ena,
+                         bool totavg_ena)
+{
+        int status = 0;
+        uint8_t val;
+        struct bofp1_data *data = dev->data;
+
+        val = (dc_ena << BOFP1_PRC_DC_ENA) |
+              (movavg_ena << BOFP1_PRC_MOVAVG_ENA) |
+              (totavg_ena << BOFP1_PRC_TOTAVG_ENA);
+
+        K_SPINLOCK(&data->lock)
+        {
+                status = bofp1_set_reg(dev, BOFP1_REG_PRCCTRL, val);
+                data->prc = status == 0 ? val : 0;
+        }
+
+        return status;
+}
+
+uint8_t bofp1_get_prc(const struct device *dev, unsigned int bit)
+{
+        struct bofp1_data *data = dev->data;
+
+        return (data->prc >> bit) & 0x1;
+}
+
 static int bofp1_reset(const struct device *dev)
 {
         return bofp1_write_reg(dev, BOFP1_REG_RESET, 0);
@@ -205,6 +232,15 @@ static int bofp1_attr_get(const struct device *dev, enum sensor_channel chan,
         case SENSOR_ATTR_BOFP1_TOTAL_AVG_N:
                 val->val1 = data->total_avg_n;
                 break;
+        case SENSOR_ATTR_BOFP1_DARK_CURRENT_ENA:
+                val->val1 = bofp1_get_prc(dev, BOFP1_PRC_DC_ENA);
+                break;
+        case SENSOR_ATTR_BOFP1_MOVING_AVG_ENA:
+                val->val1 = bofp1_get_prc(dev, BOFP1_PRC_MOVAVG_ENA);
+                break;
+        case SENSOR_ATTR_BOFP1_TOTAL_AVG_ENA:
+                val->val1 = bofp1_get_prc(dev, BOFP1_PRC_TOTAVG_ENA);
+                break;
         default:
                 return -EINVAL;
         }
@@ -216,9 +252,17 @@ static int bofp1_attr_set(const struct device *dev, enum sensor_channel chan,
                           enum sensor_attribute attr,
                           const struct sensor_value *val)
 {
+        uint8_t dc_ena;
+        uint8_t movavg_ena;
+        uint8_t totavg_ena;
+
         if (chan != SENSOR_CHAN_VOLTAGE) {
                 return -EINVAL;
         }
+
+        dc_ena = bofp1_get_prc(dev, BOFP1_PRC_DC_ENA);
+        movavg_ena = bofp1_get_prc(dev, BOFP1_PRC_MOVAVG_ENA);
+        totavg_ena = bofp1_get_prc(dev, BOFP1_PRC_TOTAVG_ENA);
 
         switch ((enum sensor_attr_bofp1)attr) {
         case SENSOR_ATTR_BOFP1_INTEGRATION:
@@ -227,6 +271,12 @@ static int bofp1_attr_set(const struct device *dev, enum sensor_channel chan,
                 return bofp1_set_moving_avg_n(dev, (uint8_t)val->val1);
         case SENSOR_ATTR_BOFP1_TOTAL_AVG_N:
                 return bofp1_set_total_avg_n(dev, (uint8_t)val->val1);
+        case SENSOR_ATTR_BOFP1_DARK_CURRENT_ENA:
+                return bofp1_set_prc(dev, val->val1, movavg_ena, totavg_ena);
+        case SENSOR_ATTR_BOFP1_MOVING_AVG_ENA:
+                return bofp1_set_prc(dev, dc_ena, val->val1, totavg_ena);
+        case SENSOR_ATTR_BOFP1_TOTAL_AVG_ENA:
+                return bofp1_set_prc(dev, dc_ena, movavg_ena, val->val1);
         default:
                 return -EINVAL;
         }
@@ -420,6 +470,11 @@ static int bofp1_init(const struct device *dev)
                 return status;
         }
 
+        status = bofp1_set_prc(dev, cfg->dc_dt, cfg->movavg_dt, cfg->totavg_dt);
+        if (status != 0) {
+                return status;
+        }
+
         return 0;
 }
 
@@ -441,6 +496,9 @@ static int bofp1_init(const struct device *dev)
                 .clock_frequency = DT_INST_PROP(inst_, clock_frequency),       \
                 .moving_avg_n_dt = DT_INST_PROP(inst_, moving_avg_n),          \
                 .total_avg_n_dt = DT_INST_PROP(inst_, total_avg_n),            \
+                .totavg_dt = DT_INST_PROP(inst_, total_avg),                   \
+                .movavg_dt = DT_INST_PROP(inst_, moving_avg),                  \
+                .dc_dt = DT_INST_PROP(inst_, dark_current),                    \
         };                                                                     \
         static struct bofp1_data bofp1_data_##inst_##__ = {                    \
                 .iodev_bus = &bofp1_iodev_##inst_##__,                         \

@@ -71,6 +71,11 @@ static uint32_t bofp1_mclk_freq(const struct device *dev)
         return cfg->clock_frequency / cfg->clkdiv;
 }
 
+static uint32_t bofp1_sample_freq(const struct device *dev)
+{
+        return bofp1_mclk_freq(dev) / 4;
+}
+
 static uint32_t bofp1_sh_div(const struct device *dev, uint32_t freq)
 {
         return (bofp1_mclk_freq(dev) / freq) - 1;
@@ -287,19 +292,28 @@ static int bofp1_attr_set(const struct device *dev, enum sensor_channel chan,
 int bofp1_enable_read(const struct device *dev)
 {
         int status;
+        uint32_t ns;
+        uint32_t frame_duration;
         const struct bofp1_cfg *cfg = dev->config;
         struct bofp1_data *data = dev->data;
 
         status = gpio_pin_interrupt_configure_dt(&cfg->fifo_w_gpios,
                                                  GPIO_INT_EDGE_TO_ACTIVE);
 
-        /* Reschedule the watchdog with a timeout of integration time + 5ms.
+        /* Reschedule the watchdog with a timeout of integration time * N + 5ms.
          * This is done because the CCD driver on the FPGA synchronizes to
          * the integration time, and may not start until after the
-         * integration time has passed. It will then use roughly 5ms to
+         * integration time has passed. If total averages is enabled,
+         * this repeats N times. It will then use roughly 5ms to
          * collect 1024 samples, which is more than what we need. */
-        k_work_reschedule(&data->watchdog_work,
-                          K_NSEC(bofp1_integration_time(dev) + 5000000));
+        ns = bofp1_integration_time(dev);
+        if (bofp1_get_prc(dev, BOFP1_PRC_TOTAVG_ENA)) {
+                frame_duration = 1000000000ULL / bofp1_sample_freq(dev) *
+                                 BOFP1_NUM_ELEMENTS_TOTAL;
+                ns += (data->total_avg_n - 1) * (frame_duration + ns);
+        }
+        ns += 5000000;
+        k_work_reschedule(&data->watchdog_work, K_NSEC(ns));
 
         return status;
 }

@@ -212,7 +212,7 @@ static void bofp1_busy_fall(const struct device *dev)
                 return;
         }
 
-        LOG_ERR("sampling done");
+        LOG_INF("sampling done");
 
         bofp1_rtio_read(data->dev);
 }
@@ -234,7 +234,7 @@ static void bofp1_fifo_wmark(const struct device *dev)
 {
         struct bofp1_data *data = dev->data;
 
-        LOG_ERR("fifo watermark hit");
+        LOG_INF("fifo watermark hit");
 
         if (!atomic_test_bit(&data->state, BOFP1_BUSY)) {
                 LOG_ERR("fifo wmark when not busy");

@@ -22,7 +22,10 @@ package ctrl_common is
 
     type t_prc_ctrl is (
         PRC_WMARK_SRC,
-        PRC_BUSY_SRC
+        PRC_BUSY_SRC,
+        PRC_TOTAVG_ENA,
+        PRC_MOVAVG_ENA,
+        PRC_DC_ENA
     );
 
     subtype t_reg_vector is std_logic_vector(7 downto 0);
@@ -34,6 +37,14 @@ package ctrl_common is
         t_reg'pos(REG_SHDIV3) => std_logic_vector(to_unsigned(80, 8)),
         t_reg'pos(REG_MOVING_AVG_N) => std_logic_vector(to_unsigned(1, 8)),
         t_reg'pos(REG_TOTAL_AVG_N) => std_logic_vector(to_unsigned(2, 8)),
+        t_reg'pos(REG_PRC_CONTROL) => (
+            t_prc_ctrl'pos(PRC_WMARK_SRC) => '0',
+            t_prc_ctrl'pos(PRC_BUSY_SRC) => '0',
+            t_prc_ctrl'pos(PRC_TOTAVG_ENA) => '1',
+            t_prc_ctrl'pos(PRC_MOVAVG_ENA) => '1',
+            t_prc_ctrl'pos(PRC_DC_ENA) => '1',
+            others => '0'
+        ),
         others => (others => '0')
     );
     

@@ -31,6 +31,7 @@ SOURCES=\
 	src/frame_ram.vhd \
 	src/frame_fifo.vhd \
 	src/window_fifo.vhd \
+	src/stage_ctrl.vhd \
 	src/avg_moving.vhd \
 	src/avg_total.vhd \
 	src/dark_current.vhd \

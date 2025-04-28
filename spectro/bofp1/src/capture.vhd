@@ -41,23 +41,34 @@ entity capture is
 end entity capture;
 
 architecture behaviour of capture is
-    signal r_ccd_rdy: std_logic;
-    signal r_ccd_busy: std_logic;
     signal r_ccd_start: std_logic;
-    signal r_ccd_data: std_logic_vector(15 downto 0);
+    signal r_ccd_rdy_out: std_logic;
+    signal r_ccd_busy_out: std_logic;
+    signal r_ccd_data_out: std_logic_vector(15 downto 0);
 
-    signal r_total_avg_busy: std_logic;
-    signal r_total_avg_rdy: std_logic;
-    signal r_total_avg_data: std_logic_vector(r_ccd_data'range);
+    signal r_total_avg_busy_out: std_logic;
+    signal r_total_avg_rdy_out: std_logic;
+    signal r_total_avg_data_out: std_logic_vector(r_ccd_data_out'range);
+    signal r_total_avg_en: std_logic;
 
-    signal r_moving_avg_rdy: std_logic;
-    signal r_moving_avg_data: std_logic_vector(r_ccd_data'range);
-    signal r_moving_avg_busy: std_logic;
+    signal r_moving_avg_rdy_in: std_logic;
+    signal r_moving_avg_rdy_out: std_logic;
+    signal r_moving_avg_data_in: std_logic_vector(r_ccd_data_out'range);
+    signal r_moving_avg_data_out: std_logic_vector(r_ccd_data_out'range);
+    signal r_moving_avg_busy_in: std_logic;
+    signal r_moving_avg_busy_out: std_logic;
 
-    signal r_dc_rdy: std_logic;
-    signal r_dc_data: std_logic_vector(r_ccd_data'range);
-    signal r_dc_busy: std_logic;
+    signal r_dc_rdy_in: std_logic;
+    signal r_dc_rdy_out: std_logic;
+    signal r_dc_data_in: std_logic_vector(r_ccd_data_out'range);
+    signal r_dc_data_out: std_logic_vector(r_ccd_data_out'range);
+    signal r_dc_busy_in: std_logic;
+    signal r_dc_busy_out: std_logic;
     signal r_dc_calib: std_logic;
+
+    signal r_pl_rdy: std_logic;
+    signal r_pl_busy: std_logic;
+    signal r_pl_data: std_logic_vector(r_ccd_data_out'range);
 
     signal r_fifo_pl_wmark: std_logic;
     signal r_fifo_raw_wmark: std_logic;
@@ -75,8 +86,8 @@ architecture behaviour of capture is
     signal r_stop: std_logic;
 begin
     r_ccd_start <= '1' when r_state = S_STARTING else '0';
-    r_fifo_pl_wr <= r_dc_rdy and not r_dc_calib;
-    r_fifo_raw_wr <= r_ccd_rdy and not r_dc_calib;
+    r_fifo_pl_wr <= r_pl_rdy and not r_dc_calib;
+    r_fifo_raw_wr <= r_ccd_rdy_out and not r_dc_calib;
 
     u_ccd: entity work.tcd1304(rtl)
         generic map(
@@ -102,9 +113,9 @@ begin
             o_pin_icg => o_pin_icg,
             o_pin_mclk => o_pin_mclk,
 
-            o_busy => r_ccd_busy,
-            o_data_rdy => r_ccd_rdy,
-            o_data => r_ccd_data
+            o_busy => r_ccd_busy_out,
+            o_data_rdy => r_ccd_rdy_out,
+            o_data => r_ccd_data_out
         );
 
     u_fifo_raw: entity work.frame_fifo
@@ -116,7 +127,7 @@ begin
             i_clk => i_clk,
             i_rst_n => i_rst_n,
             i_wr => r_fifo_raw_wr,
-            i_data => r_ccd_data,
+            i_data => r_ccd_data_out,
             i_rd => i_fifo_raw_rd,
             o_data => o_fifo_raw_data,
             o_watermark => r_fifo_raw_wmark,
@@ -128,12 +139,30 @@ begin
             i_clk => i_clk,
             i_rst_n => i_rst_n,
             i_n => get_reg(i_regmap, REG_TOTAL_AVG_N)(3 downto 0),
-            i_data => r_ccd_data,
-            i_en => r_ccd_busy,
-            i_rdy => r_ccd_rdy,
-            o_data => r_total_avg_data,
-            o_rdy => r_total_avg_rdy,
-            o_busy => r_total_avg_busy
+            i_data => r_ccd_data_out,
+            i_en => r_ccd_busy_out,
+            i_rdy => r_ccd_rdy_out,
+            o_data => r_total_avg_data_out,
+            o_rdy => r_total_avg_rdy_out,
+            o_busy => r_total_avg_busy_out
+        );
+
+    u_totavg_ctrl: entity work.stage_ctrl
+        generic map(
+            C_FIELD => PRC_TOTAVG_ENA
+        )
+        port map(
+            i_regmap => i_regmap,
+            i_rdy_raw => r_ccd_rdy_out,
+            i_busy_raw => r_ccd_busy_out,
+            i_data_raw => r_ccd_data_out,
+            i_rdy_pl => r_total_avg_rdy_out,
+            i_busy_pl => r_total_avg_busy_out,
+            i_data_pl => r_total_avg_data_out,
+            o_rdy => r_moving_avg_rdy_in,
+            o_busy => r_moving_avg_busy_in,
+            o_data => r_moving_avg_data_in,
+            o_en => r_total_avg_en
         );
 
     u_moving_avg: entity work.avg_moving
@@ -141,12 +170,29 @@ begin
             i_clk => i_clk,
             i_rst_n => i_rst_n,
             i_n => get_reg(i_regmap, REG_MOVING_AVG_N)(3 downto 0),
-            i_en => r_total_avg_busy,
-            i_rdy => r_total_avg_rdy,
-            i_data => r_total_avg_data,
-            o_busy => r_moving_avg_busy,
-            o_rdy => r_moving_avg_rdy,
-            o_data => r_moving_avg_data
+            i_en => r_moving_avg_busy_in,
+            i_rdy => r_moving_avg_rdy_in,
+            i_data => r_moving_avg_data_in,
+            o_busy => r_moving_avg_busy_out,
+            o_rdy => r_moving_avg_rdy_out,
+            o_data => r_moving_avg_data_out
+        );
+
+    u_movavg_ctrl: entity work.stage_ctrl
+        generic map(
+            C_FIELD => PRC_MOVAVG_ENA
+        )
+        port map(
+            i_regmap => i_regmap,
+            i_rdy_raw => r_moving_avg_rdy_in,
+            i_busy_raw => r_moving_avg_busy_in,
+            i_data_raw => r_moving_avg_data_in,
+            i_rdy_pl => r_moving_avg_rdy_out,
+            i_busy_pl => r_moving_avg_busy_out,
+            i_data_pl => r_moving_avg_data_out,
+            o_rdy => r_dc_rdy_in,
+            o_busy => r_dc_busy_in,
+            o_data => r_dc_data_in
         );
 
     u_dark_current: entity work.dark_current
@@ -154,13 +200,30 @@ begin
             i_clk => i_clk,
             i_rst_n => i_rst_n,
             i_calib => i_dc_calib,
-            i_en => r_moving_avg_busy,
-            i_rdy => r_moving_avg_rdy,
-            i_data => r_moving_avg_data,
-            o_rdy => r_dc_rdy,
-            o_busy => r_dc_busy,
-            o_data => r_dc_data,
+            i_en => r_dc_busy_in,
+            i_rdy => r_dc_rdy_in,
+            i_data => r_dc_data_in,
+            o_rdy => r_dc_rdy_out,
+            o_busy => r_dc_busy_out,
+            o_data => r_dc_data_out,
             o_errors => o_errors
+        );
+
+    u_dc_ctrl: entity work.stage_ctrl
+        generic map(
+            C_FIELD => PRC_DC_ENA
+        )
+        port map(
+            i_regmap => i_regmap,
+            i_rdy_raw => r_dc_rdy_in,
+            i_busy_raw => r_dc_busy_in,
+            i_data_raw => r_dc_data_in,
+            i_rdy_pl => r_dc_rdy_out,
+            i_busy_pl => r_dc_busy_out,
+            i_data_pl => r_dc_data_out,
+            o_rdy => r_pl_rdy,
+            o_busy => r_pl_busy,
+            o_data => r_pl_data
         );
 
     u_fifo_pl: entity work.frame_fifo
@@ -172,7 +235,7 @@ begin
             i_clk => i_clk,
             i_rst_n => i_rst_n,
             i_wr => r_fifo_pl_wr,
-            i_data => r_dc_data,
+            i_data => r_pl_data,
             i_rd => i_fifo_pl_rd,
             o_data => o_fifo_pl_data,
             o_watermark => r_fifo_pl_wmark,
@@ -191,9 +254,9 @@ begin
     p_busy: process(all)
     begin
         if get_prc(i_regmap, PRC_BUSY_SRC) = '1' then
-            o_busy <= r_moving_avg_busy;
+            o_busy <= r_pl_busy;
         else
-            o_busy <= r_ccd_busy;
+            o_busy <= r_ccd_busy_out;
         end if;
     end process p_busy;
 
@@ -240,12 +303,12 @@ begin
                         r_state <= S_WAITING;
 
                     when S_WAITING =>
-                        if r_dc_busy = '1' then
+                        if r_pl_busy = '1' then
                             r_state <= S_RUNNING;
                         end if;
 
                     when S_RUNNING =>
-                        if r_ccd_busy = '0' then
+                        if r_ccd_busy_out = '0' then
                             r_state <= S_STOP_WAIT;
                         end if;
 
@@ -255,9 +318,9 @@ begin
                         end if;
 
                     when S_STOPPING =>
-                        if r_total_avg_busy = '1' then
+                        if r_total_avg_en = '1' and r_total_avg_busy_out = '1' then
                             r_state <= S_STARTING;
-                        elsif r_dc_busy = '0' then
+                        elsif r_pl_busy = '0' then
                             r_state <= S_IDLE;
                         end if;
 

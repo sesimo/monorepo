@@ -48,6 +48,10 @@ properties:
   dark-current:
     type: boolean
     description: Remove dark current from sample
+
+  light:
+    type: phandle
+    description: Light source
   
   total-avg:
     type: boolean

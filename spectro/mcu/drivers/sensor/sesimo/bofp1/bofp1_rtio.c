@@ -4,11 +4,19 @@
 #include <zephyr/logging/log.h>
 #include <zephyr/drivers/sensor.h>
 
+#include <drivers/light.h>
+
 #include "bofp1.h"
 
 LOG_MODULE_DECLARE(sesimo_bofp1);
 
-#define READ_CHUNK_SIZE (256 * sizeof(uint16_t))
+#define READ_CHUNK_SIZE (1024 * sizeof(uint16_t))
+#define LIGHT_TIMEOUT   (K_MSEC(300))
+
+static void bofp1_finish(const struct device *dev, int status);
+
+static void bofp1_rtio_err(struct rtio *r, const struct rtio_sqe *sqe,
+                           void *dev_arg);
 
 static inline size_t bofp1_frame_size(const struct device *dev)
 {
@@ -32,7 +40,35 @@ static void bofp1_set_status(const struct device *dev, int status)
         }
 }
 
-static void bofp1_submit_fetch(struct rtio_iodev_sqe *iodev_sqe)
+static void bofp1_dc_calib_done(struct rtio_iodev_sqe *iodev_sqe)
+{
+        int status;
+        const struct sensor_read_config *config = iodev_sqe->sqe.iodev->data;
+        const struct device *dev = config->sensor;
+        struct bofp1_data *data = dev->data;
+        const struct bofp1_cfg *cfg = dev->config;
+
+        /* Busy should be cleared by the ISR/GPIO callback, before submitting
+         * this callback to the work queue. If it is set, something strange
+         * has happened. */
+        if (atomic_test_bit(&data->state, BOFP1_BUSY) ||
+            !atomic_test_and_clear_bit(&data->state, BOFP1_DC_CALIB)) {
+                LOG_WRN("spurious event");
+                return;
+        }
+
+        status = light_on(cfg->light);
+        if (status != 0) {
+                bofp1_finish(dev, status);
+                return;
+        }
+
+        k_work_reschedule(&data->light_wait_work, LIGHT_TIMEOUT);
+
+        LOG_INF("dc calibration done");
+}
+
+static void bofp1_light_ready(struct rtio_iodev_sqe *iodev_sqe)
 {
         int status;
         const struct sensor_read_config *config = iodev_sqe->sqe.iodev->data;
@@ -40,50 +76,78 @@ static void bofp1_submit_fetch(struct rtio_iodev_sqe *iodev_sqe)
         struct bofp1_data *data = dev->data;
         struct rtio_sqe *sqe;
         uint8_t reg[2];
-        size_t real_len;
 
-        if (atomic_test_and_set_bit(&data->state, BOFP1_BUSY)) {
-                LOG_ERR("ccd busy");
-                rtio_iodev_sqe_err(iodev_sqe, -EBUSY);
-                return;
+        if (atomic_test_bit(&data->state, BOFP1_DC_CALIB)) {
+                reg[0] = BOFP1_WRITE_REG(BOFP1_REG_DC_CALIB);
+
+                LOG_INF("begin dc calibration");
+        } else {
+                reg[0] = BOFP1_WRITE_REG(BOFP1_REG_SAMPLE);
+
+                LOG_INF("begin sampling");
         }
 
         status = bofp1_enable_read(dev);
         if (status != 0) {
-                atomic_clear_bit(&data->state, BOFP1_BUSY);
-                rtio_iodev_sqe_err(iodev_sqe, status);
+                bofp1_finish(dev, status);
                 return;
+        }
+
+        atomic_set_bit(&data->state, BOFP1_BUSY);
+
+        sqe = rtio_sqe_acquire(data->rtio_ctx);
+        __ASSERT_NO_MSG(sqe != NULL);
+
+        reg[1] = 0;
+        rtio_sqe_prep_tiny_write(sqe, data->iodev_bus, RTIO_PRIO_NORM, reg,
+                                 sizeof(reg), NULL);
+        rtio_submit(data->rtio_ctx, 0);
+}
+
+static void bofp1_light_ready_work(struct k_work *work)
+{
+        struct k_work_delayable *dwork = k_work_delayable_from_work(work);
+        struct bofp1_data *data =
+                CONTAINER_OF(dwork, struct bofp1_data, light_wait_work);
+
+        struct rtio_work_req *req = rtio_work_req_alloc();
+        __ASSERT_NO_MSG(req != NULL);
+
+        rtio_work_req_submit(req, data->iodev_sqe, bofp1_light_ready);
+}
+
+static void bofp1_submit_fetch(struct rtio_iodev_sqe *iodev_sqe)
+{
+        int status;
+        const struct sensor_read_config *config = iodev_sqe->sqe.iodev->data;
+        const struct device *dev = config->sensor;
+        struct bofp1_data *data = dev->data;
+        const struct bofp1_cfg *cfg = dev->config;
+        size_t real_len;
+
+        status = light_off(cfg->light);
+        if (status != 0) {
+                goto error;
         }
 
         status = rtio_sqe_rx_buf(iodev_sqe, bofp1_frame_size(dev),
                                  bofp1_frame_size(dev), &data->wr_buf,
                                  &real_len);
         if (status != 0) {
-                (void)bofp1_disable_read(dev);
-                atomic_clear_bit(&data->state, BOFP1_BUSY);
-                rtio_iodev_sqe_err(iodev_sqe, status);
-                return;
-        }
-
-        sqe = rtio_sqe_acquire(data->rtio_ctx);
-        if (sqe == NULL) {
-                (void)bofp1_disable_read(dev);
-                atomic_clear_bit(&data->state, BOFP1_BUSY);
-                rtio_iodev_sqe_err(iodev_sqe, -ENOMEM);
-                return;
+                goto error;
         }
 
         atomic_set(&data->status, 0);
-
-        reg[0] = BOFP1_WRITE_REG(BOFP1_REG_SAMPLE);
-        reg[1] = 0;
-        rtio_sqe_prep_tiny_write(sqe, data->iodev_bus, RTIO_PRIO_NORM, reg,
-                                 sizeof(reg), NULL);
+        atomic_set_bit(&data->state, BOFP1_DC_CALIB);
 
         data->iodev_sqe = iodev_sqe;
         data->wr_index = 0;
 
-        rtio_submit(data->rtio_ctx, 0);
+        k_work_reschedule(&data->light_wait_work, LIGHT_TIMEOUT);
+        return;
+
+error:
+        bofp1_finish(dev, status);
 }
 
 static void bofp1_finish(const struct device *dev, int status)
@@ -306,6 +370,23 @@ void bofp1_rtio_read(const struct device *dev)
         rtio_work_req_submit(req, data->iodev_sqe, bofp1_data_read_work);
 }
 
+void bofp1_rtio_complete(const struct device *dev)
+{
+        int status;
+        struct bofp1_data *data = dev->data;
+        struct rtio_work_req *req = rtio_work_req_alloc();
+
+        status = bofp1_disable_read(dev);
+        __ASSERT_NO_MSG(status == 0);
+
+        if (atomic_test_bit(&data->state, BOFP1_DC_CALIB)) {
+                rtio_work_req_submit(req, data->iodev_sqe, bofp1_dc_calib_done);
+        } else {
+                rtio_work_req_submit(req, data->iodev_sqe,
+                                     bofp1_data_read_work);
+        }
+}
+
 void bofp1_rtio_watchdog(struct k_work *work)
 {
         int status;
@@ -321,4 +402,14 @@ void bofp1_rtio_watchdog(struct k_work *work)
 
         req = rtio_work_req_alloc();
         rtio_work_req_submit(req, data->iodev_sqe, bofp1_abort_work);
+}
+
+int bofp1_rtio_init(const struct device *dev)
+{
+        struct bofp1_data *data = dev->data;
+
+        k_work_init_delayable(&data->light_wait_work, bofp1_light_ready_work);
+        k_work_init_delayable(&data->watchdog_work, bofp1_rtio_watchdog);
+
+        return 0;
 }

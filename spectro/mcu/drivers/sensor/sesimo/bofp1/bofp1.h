@@ -12,10 +12,8 @@
 #define BOFP1_READ_REG(r)  (r << BOFP1_REG_OFFSET)
 #define BOFP1_WRITE_REG(r) ((r << BOFP1_REG_OFFSET) | BOFP1_REG_BIT_WR)
 
-/* Stream raw data for entirety of transmission */
-#define BOFP1_REG_STREAM       (0x0)
 /* Stream pipeline data for entirety of transmission */
-#define BOFP1_REG_STREAM_PL    (0x1)
+#define BOFP1_REG_STREAM       (0x1)
 #define BOFP1_REG_SAMPLE       (0x2) /* Begin sample. Write only */
 #define BOFP1_REG_RESET        (0x3) /* Reset */
 #define BOFP1_REG_CCD_SH1      (0x4) /* 24bit SH freq (clock div) MSB byte 0 */
@@ -41,7 +39,8 @@
 #define BOFP1_NUM_ELEMENTS_TOTAL                                               \
         (BOFP1_NUM_ELEMENTS_REAL + BOFP1_NUM_ELEMENTS_DUMMY)
 
-#define BOFP1_BUSY (0) /* Sensor busy */
+#define BOFP1_BUSY     (0) /* Sensor busy */
+#define BOFP1_DC_CALIB (1) /* In DC calib */
 
 struct bofp1_cfg {
         uint8_t clkdiv;
@@ -56,6 +55,8 @@ struct bofp1_cfg {
         struct spi_dt_spec bus;
         struct gpio_dt_spec busy_gpios;
         struct gpio_dt_spec fifo_w_gpios;
+
+        const struct device* light;
 };
 
 struct bofp1_data {
@@ -86,10 +87,13 @@ struct bofp1_data {
         struct k_spinlock lock;
 
         struct k_work_delayable watchdog_work;
+        struct k_work_delayable light_wait_work;
 
         atomic_t state;
         atomic_t status;
 };
+
+int bofp1_rtio_init(const struct device *dev);
 
 int bofp1_access(const struct device *dev, bool write, uint8_t addr, void *data,
                  size_t size);
@@ -110,6 +114,8 @@ int bofp1_get_decoder(const struct device *dev,
 bool bofp1_gpio_check(const struct device *dev);
 
 void bofp1_rtio_read(const struct device *dev);
+
+void bofp1_rtio_complete(const struct device *dev);
 
 void bofp1_rtio_watchdog(struct k_work *work);
 

@@ -340,9 +340,9 @@ static void bofp1_busy_fall(const struct device *dev)
                 return;
         }
 
-        LOG_INF("sampling done");
+        LOG_INF("busy fall");
 
-        bofp1_rtio_read(data->dev);
+        bofp1_rtio_complete(data->dev);
 }
 
 static void bofp1_busy_fall_cb(const struct device *gpio,
@@ -437,11 +437,11 @@ static int bofp1_init(const struct device *dev)
         const struct bofp1_cfg *cfg = dev->config;
         struct bofp1_data *data = dev->data;
 
-        if (!spi_is_ready_dt(&cfg->bus)) {
+        if (!spi_is_ready_dt(&cfg->bus) || !device_is_ready(cfg->light)) {
                 return -EBUSY;
         }
 
-        k_work_init_delayable(&data->watchdog_work, bofp1_rtio_watchdog);
+        (void)bofp1_rtio_init(dev);
 
         status = bofp1_init_gpio(&cfg->busy_gpios, bofp1_busy_fall_cb,
                                  &data->busy_fall_cb, BIT(cfg->busy_gpios.pin));
@@ -513,6 +513,7 @@ static int bofp1_init(const struct device *dev)
                 .totavg_dt = DT_INST_PROP(inst_, total_avg),                   \
                 .movavg_dt = DT_INST_PROP(inst_, moving_avg),                  \
                 .dc_dt = DT_INST_PROP(inst_, dark_current),                    \
+                .light = DEVICE_DT_GET(DT_INST_PHANDLE(inst_, light)),         \
         };                                                                     \
         static struct bofp1_data bofp1_data_##inst_##__ = {                    \
                 .iodev_bus = &bofp1_iodev_##inst_##__,                         \

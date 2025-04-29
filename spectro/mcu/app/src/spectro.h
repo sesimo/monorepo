@@ -45,4 +45,19 @@ uint32_t spectro_get_int_time(void);
  */
 int spectro_set_int_time(uint32_t int_us);
 
+/**
+ * @brief Set ctrl parameters for pipeline
+ *
+ * The arguments @p dc, @p totavg and @p movavg control whether or not the
+ * respective pipeline stage is skipped or not.
+ *
+ * @param dc false to skip dark current stage, true if not
+ * @param totavg false to skip total average stage, true if not
+ * @param movavg false to skip movavg stage, true if not
+ * @return int
+ * @retval 0 Success
+ * @retval <0 Negative errno code
+ */
+int spectro_set_pipeline_ctrl(uint8_t dc, uint8_t totavg, uint8_t movavg);
+
 #endif /* SPECTRO_H__ */

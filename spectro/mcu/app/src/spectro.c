@@ -154,6 +154,33 @@ int spectro_set_int_time(uint32_t int_us)
         return status;
 }
 
+int spectro_set_pipeline_ctrl(uint8_t dc, uint8_t totavg, uint8_t movavg)
+{
+        int status;
+        struct {
+                enum sensor_attr_bofp1 attr;
+                uint8_t val;
+        } values[] = {
+                {SENSOR_ATTR_BOFP1_DARK_CURRENT_ENA, dc},
+                {SENSOR_ATTR_BOFP1_TOTAL_AVG_ENA, totavg},
+                {SENSOR_ATTR_BOFP1_MOVING_AVG_ENA, movavg},
+        };
+        size_t i;
+        struct sensor_value sensor_val;
+
+        for (i = 0; i < ARRAY_SIZE(values); i++) {
+                sensor_val.val1 = values[i].val;
+                status = sensor_attr_set(dev, SENSOR_CHAN_VOLTAGE,
+                                         (enum sensor_attribute)values[i].attr,
+                                         &sensor_val);
+                if (status != 0) {
+                        break;
+                }
+        }
+
+        return status;
+}
+
 static void aq_thread(void *p1, void *p2, void *p3)
 {
         int status;

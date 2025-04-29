@@ -23,6 +23,9 @@ end entity frame_ram;
 architecture behaviour of frame_ram is
     signal r_rst: std_logic;
     signal r_rd_data: std_logic_vector(o_rd_data'range);
+
+    signal r_rd_en_tmp: std_logic;
+    signal r_rd_en: std_logic;
 begin
     r_rst <= not i_rst_n;
 
@@ -50,10 +53,16 @@ begin
 
     -- Vivado BRAM block updates douta whenever addra is changed, but we
     -- want to update it only when rd_en goes high.
+    --
+    -- The read delay on the Vivado BRAM is also 2 cycles, which means that
+    -- we need to wait an extra 2 cycles before copying the data.
     p_read: process(i_clk)
     begin
         if rising_edge(i_clk) then
-            if i_rd_en = '1' then
+            r_rd_en_tmp <= i_rd_en;
+            r_rd_en <= r_rd_en_tmp;
+
+            if r_rd_en = '1' then
                 o_rd_data <= r_rd_data;
             end if;
         end if;

@@ -27,10 +27,8 @@ architecture behaviour of avg_total is
     signal r_pix_state: t_pix_state;
 
     signal r_en_fall: std_logic;
-    signal r_en_fall_sync: std_logic;
     signal r_cnt_rst_n: std_logic;
     signal r_cnt_roll: std_logic;
-    signal r_cnt_roll_sync: std_logic;
 
     signal r_rd_en: std_logic;
     signal r_wr_en: std_logic;
@@ -116,7 +114,7 @@ begin
             r_loaded <= true;
             r_rd_en <= '0';
 
-            if r_frame_state = S_FRAME_IDLE then
+            if r_frame_state = S_FRAME_IDLE or i_en = '0' then
                 r_loaded <= false;
             elsif not r_loaded or r_pix_state = S_LOAD then
                 r_rd_en <= '1';
@@ -142,14 +140,10 @@ begin
     p_addr: process(i_clk)
     begin
         if rising_edge(i_clk) then
-            if i_rst_n = '0' then
+            if i_rst_n = '0' or i_en = '0' then
                 r_addr <= (others => '0');
             elsif r_pix_state = S_LOAD then
-                if i_en = '0' then
-                    r_addr <= (others => '0');
-                else
-                    r_addr <= r_addr + 1;
-                end if;
+                r_addr <= r_addr + 1;
             end if;
         end if;
     end process p_addr;
@@ -195,14 +189,13 @@ begin
     p_pix_state: process(i_clk)
     begin
         if rising_edge(i_clk) then
-            if i_rst_n = '0' then
-                r_pix_state <= S_CALC_ADD;
+            if i_rst_n = '0' or i_en = '0' then
+                r_pix_state <= S_PIX_IDLE;
             else
                 case r_pix_state is
                     when S_PIX_IDLE =>
-                        if i_en = '1' then
-                            r_pix_state <= S_CALC_ADD;
-                        end if;
+                        r_pix_state <= S_CALC_ADD;
+
                     when S_CALC_ADD =>
                         if i_rdy = '1' then
                             r_pix_state <= S_CALC_DIV;
@@ -225,32 +218,6 @@ begin
         end if;
     end process p_pix_state;
 
-    -- Synchronise the enable signals needed to transition between frame
-    -- states. This is done because we only want to transition when the
-    -- pixel is in the ready state.
-    p_ready_sync: process(i_clk)
-    begin
-        if rising_edge(i_clk) then
-            if i_rst_n = '0' then
-                r_en_fall_sync <= '0';
-                r_cnt_roll_sync <= '0';
-            else
-                if r_pix_state = S_READY then
-                    r_en_fall_sync <= '0';
-                    r_cnt_roll_sync <= '0';
-                end if;
-
-                if r_en_fall = '1' then
-                    r_en_fall_sync <= '1';
-                end if;
-
-                if r_cnt_roll = '1' then
-                    r_cnt_roll_sync <= '1';
-                end if;
-            end if;
-        end if;
-    end process p_ready_sync;
-
     -- Handle state changes in between frames
     p_frame_state: process(i_clk)
     begin
@@ -265,7 +232,7 @@ begin
                         end if;
 
                     when S_FIRST =>
-                        if r_pix_state = S_READY and r_en_fall_sync = '1' then
+                        if r_en_fall = '1' then
                             if r_single then
                                 r_frame_state <= S_FRAME_IDLE;
                             elsif r_double then
@@ -276,12 +243,12 @@ begin
                         end if;
 
                     when S_NORMAL =>
-                        if r_pix_state = S_READY and r_cnt_roll_sync = '1' then
+                        if r_cnt_roll = '1' then
                             r_frame_state <= S_LAST;
                         end if;
 
                     when S_LAST =>
-                        if r_pix_state = S_READY and r_en_fall_sync = '1' then
+                        if r_en_fall = '1' then
                             r_frame_state <= S_FRAME_IDLE;
                         end if;
 

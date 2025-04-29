@@ -64,8 +64,12 @@ architecture rtl of tcd1304 is
 
     signal r_adc_done: std_logic;
 
+    signal r_pix_cnt: std_logic_vector(11 downto 0);
     signal r_cnt_rolled: std_logic;
     signal r_icg_rolled: std_logic;
+
+    constant c_first: unsigned(11 downto 0) := to_unsigned(32, 12);
+    constant c_last: unsigned(11 downto 0) := to_unsigned(G_NUM_ELEMENTS-16, 12);
 begin
     r_sh_div <= std_logic_vector(resize(
                  unsigned(i_sh_div) + 1, r_sh_div'length));
@@ -185,6 +189,7 @@ begin
             i_rst_n => i_rst_n,
             i_en => r_adc_done,
             i_max => std_logic_vector(to_unsigned(G_NUM_ELEMENTS, 12)),
+            o_cnt => r_pix_cnt,
             o_roll => r_cnt_rolled
         );
 
@@ -236,12 +241,26 @@ begin
         end if;
     end process p_state;
 
+    -- Only drive the ready signal when reading an effective element
+    -- (not dummy element).
+    p_rdy: process(all)
+    begin
+        if i_rst_n = '0' then
+            o_data_rdy <= '0';
+        else
+            if unsigned(r_pix_cnt) >= c_first and unsigned(r_pix_cnt) < c_last then
+                o_data_rdy <= r_adc_done;
+            else
+                o_data_rdy <= '0';
+            end if;
+        end if;
+    end process p_rdy;
+
     r_data_read <= r_data_enable when r_state = S_CAPTURE else '0';
     r_icg_buf <= '1' when r_state = S_ICG else '0';
     o_busy <= '0' when r_state = S_IDLE else '1';
     o_pin_icg <= r_icg_buf;
     o_pin_mclk <= r_mclk_buf;
     o_pin_sh <= r_sh_delayed;
-    o_data_rdy <= r_adc_done;
 
 end architecture rtl;

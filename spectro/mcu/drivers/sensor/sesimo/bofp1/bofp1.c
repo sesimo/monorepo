@@ -301,8 +301,8 @@ static k_timeout_t bofp1_timeout(const struct device *dev)
          * integration time has passed. If total averages is enabled,
          * this repeats N times. It will then use roughly 5ms to
          * collect 1024 samples, which is more than what we need. */
-        frame_duration = 1000000000ULL / bofp1_sample_freq(dev) *
-                         BOFP1_NUM_ELEMENTS_TOTAL;
+        frame_duration =
+                1000000000ULL / bofp1_sample_freq(dev) * BOFP1_NUM_ELEMENTS;
         ns = bofp1_integration_time(dev) + frame_duration;
         if (bofp1_get_prc(dev, BOFP1_PRC_TOTAVG_ENA)) {
                 ns += (data->total_avg_n) * (frame_duration + ns);

@@ -26,11 +26,11 @@ static int bofp1_decode(const uint8_t *buf, struct sensor_chan_spec chan,
                 return -ENOTSUP;
         }
 
-        if (*fit >= BOFP1_NUM_ELEMENTS_REAL) {
+        if (*fit >= BOFP1_NUM_ELEMENTS) {
                 return 0;
         }
 
-        ptr = buf + (BOFP1_NUM_ELEMENTS_DUMMY_LEFT + *fit) * sizeof(uint16_t);
+        ptr = buf + sizeof(struct bofp1_rtio_header) + *fit * sizeof(uint16_t);
         value = sys_get_be16(ptr);
 
         data->shift = 10;
@@ -58,14 +58,16 @@ static int bofp1_get_frame_count(const uint8_t *buf,
                                  struct sensor_chan_spec chan,
                                  uint16_t *frame_count)
 {
-        ARG_UNUSED(buf);
+        struct bofp1_rtio_header header;
 
         if (chan.chan_type != SENSOR_CHAN_VOLTAGE || chan.chan_idx != 0) {
                 return -ENOTSUP;
         }
 
+        (void)memcpy(&header, buf, sizeof(header));
+
         /* Driver currently only supports a full, constant-length readout */
-        *frame_count = BOFP1_NUM_ELEMENTS_REAL;
+        *frame_count = header.frames;
         return 0;
 }
 

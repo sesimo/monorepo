@@ -31,13 +31,7 @@
 #define BOFP1_PRC_MOVAVG_ENA (0x3)
 #define BOFP1_PRC_DC_ENA     (0x4)
 
-#define BOFP1_NUM_ELEMENTS_REAL        (3648)
-#define BOFP1_NUM_ELEMENTS_DUMMY_LEFT  (32)
-#define BOFP1_NUM_ELEMENTS_DUMMY_RIGHT (14)
-#define BOFP1_NUM_ELEMENTS_DUMMY                                               \
-        (BOFP1_NUM_ELEMENTS_DUMMY_LEFT + BOFP1_NUM_ELEMENTS_DUMMY_RIGHT)
-#define BOFP1_NUM_ELEMENTS_TOTAL                                               \
-        (BOFP1_NUM_ELEMENTS_REAL + BOFP1_NUM_ELEMENTS_DUMMY)
+#define BOFP1_NUM_ELEMENTS (3648)
 
 #define BOFP1_BUSY     (0) /* Sensor busy */
 #define BOFP1_DC_CALIB (1) /* In DC calib */
@@ -91,6 +85,10 @@ struct bofp1_data {
 
         atomic_t state;
         atomic_t status;
+};
+
+struct bofp1_rtio_header {
+        size_t frames;
 };
 
 int bofp1_rtio_init(const struct device *dev);

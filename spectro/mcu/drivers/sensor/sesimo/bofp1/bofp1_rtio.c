@@ -23,9 +23,9 @@ static inline size_t bofp1_frame_size(const struct device *dev)
         struct bofp1_data *data = dev->data;
         size_t ret;
 
-        ret = BOFP1_NUM_ELEMENTS_TOTAL;
+        ret = BOFP1_NUM_ELEMENTS;
         if (bofp1_get_prc(dev, BOFP1_PRC_MOVAVG_ENA)) {
-                ret -= data->moving_avg_n * 2;
+                ret -= data->moving_avg_n * 2 + 1;
         }
 
         return ret * sizeof(uint16_t);
@@ -123,19 +123,25 @@ static void bofp1_submit_fetch(struct rtio_iodev_sqe *iodev_sqe)
         const struct device *dev = config->sensor;
         struct bofp1_data *data = dev->data;
         const struct bofp1_cfg *cfg = dev->config;
+        size_t req_len;
         size_t real_len;
+        struct bofp1_rtio_header header;
 
         status = light_off(cfg->light);
         if (status != 0) {
                 goto error;
         }
 
-        status = rtio_sqe_rx_buf(iodev_sqe, bofp1_frame_size(dev),
-                                 bofp1_frame_size(dev), &data->wr_buf,
+        header.frames = bofp1_frame_size(dev) / 2;
+        req_len = sizeof(header) + bofp1_frame_size(dev);
+
+        status = rtio_sqe_rx_buf(iodev_sqe, req_len, req_len, &data->wr_buf,
                                  &real_len);
         if (status != 0) {
                 goto error;
         }
+
+        (void)memcpy(data->wr_buf, &header, sizeof(header));
 
         atomic_set(&data->status, 0);
         atomic_set_bit(&data->state, BOFP1_DC_CALIB);

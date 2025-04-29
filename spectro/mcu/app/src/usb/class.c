@@ -14,6 +14,8 @@ LOG_MODULE_REGISTER(bomc1_usb);
 #define BOMC1_VRQ_SPECTRO_READ     (0x1) /* Begin CCD read */
 #define BOMC1_VRQ_SPECTRO_INT_TIME (0x2) /* Integration time */
 #define BOMC1_VRQ_SPECTRO_PL_CTRL  (0x3) /* Pipeline control */
+#define BOMC1_VRQ_SPECTRO_MOVAVG_N (0x4) /* Moving average N */
+#define BOMC1_VRQ_SPECTRO_TOTAVG_N (0x5) /* Total average N */
 
 #define BOMC1_PL_CTRL_DC     (0)
 #define BOMC1_PL_CTRL_MOVAVG (1)
@@ -188,7 +190,7 @@ static int bomc1_usbd_ctd(struct usbd_class_data *const c_data,
 {
         int status;
         uint32_t int_time;
-        uint8_t pl_ctrl;
+        uint8_t byte;
         struct bomc1_usb_ctx *ctx = usbd_class_get_private(c_data);
 
         LOG_DBG("vendor request %" PRIu8 " (to device)", setup->bRequest);
@@ -215,12 +217,25 @@ static int bomc1_usbd_ctd(struct usbd_class_data *const c_data,
                         return -ENOTSUP;
                 }
 
-                pl_ctrl = buf->data[0];
+                byte = buf->data[0];
 
                 return spectro_set_pipeline_ctrl(
-                        (pl_ctrl >> BOMC1_PL_CTRL_DC) & 1,
-                        (pl_ctrl >> BOMC1_PL_CTRL_MOVAVG) & 1,
-                        (pl_ctrl >> BOMC1_PL_CTRL_TOTAVG) & 1);
+                        (byte >> BOMC1_PL_CTRL_DC) & 1,
+                        (byte >> BOMC1_PL_CTRL_TOTAVG) & 1,
+                        (byte >> BOMC1_PL_CTRL_MOVAVG) & 1);
+
+        case BOMC1_VRQ_SPECTRO_TOTAVG_N:
+        case BOMC1_VRQ_SPECTRO_MOVAVG_N:
+                if (setup->wLength != sizeof(uint8_t)) {
+                        return -ENOTSUP;
+                }
+
+                byte = buf->data[0];
+                if (setup->bRequest == BOMC1_VRQ_SPECTRO_MOVAVG_N) {
+                        return spectro_set_moving_avg_n(byte);
+                }
+
+                return spectro_set_total_avg_n(byte);
         default:
                 return -ENOTSUP;
         }
@@ -332,7 +347,8 @@ static struct bomc1_usb_ctx bomc1_usb_ctx = {
 
 struct usbd_cctx_vendor_req bomc1_usb_vendor_req =
         USBD_VENDOR_REQ(BOMC1_VRQ_SPECTRO_READ, BOMC1_VRQ_SPECTRO_INT_TIME,
-                        BOMC1_VRQ_SPECTRO_PL_CTRL);
+                        BOMC1_VRQ_SPECTRO_PL_CTRL, BOMC1_VRQ_SPECTRO_MOVAVG_N,
+                        BOMC1_VRQ_SPECTRO_TOTAVG_N);
 
 USBD_DEFINE_CLASS(bomc1_usb, &bomc1_usb_api, &bomc1_usb_ctx,
                   &bomc1_usb_vendor_req);

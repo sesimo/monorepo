@@ -60,4 +60,24 @@ int spectro_set_int_time(uint32_t int_us);
  */
 int spectro_set_pipeline_ctrl(uint8_t dc, uint8_t totavg, uint8_t movavg);
 
+/**
+ * @brief Set number of neighbours to include in a moving average algorithm 
+ *
+ * @param n
+ * @return int
+ * @retval 0 Success
+ * @retval <0 Negative errno code
+ */
+int spectro_set_moving_avg_n(uint8_t n);
+
+/**
+ * @brief Set number of samples to average
+ *
+ * @param n
+ * @return int
+ * @retval 0 Success
+ * @retval <0 Negative errno code
+ */
+int spectro_set_total_avg_n(uint8_t n);
+
 #endif /* SPECTRO_H__ */

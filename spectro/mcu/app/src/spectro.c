@@ -168,6 +168,8 @@ int spectro_set_pipeline_ctrl(uint8_t dc, uint8_t totavg, uint8_t movavg)
         size_t i;
         struct sensor_value sensor_val;
 
+        (void)k_mutex_lock(&lock, K_FOREVER);
+
         for (i = 0; i < ARRAY_SIZE(values); i++) {
                 sensor_val.val1 = values[i].val;
                 status = sensor_attr_set(dev, SENSOR_CHAN_VOLTAGE,
@@ -177,6 +179,42 @@ int spectro_set_pipeline_ctrl(uint8_t dc, uint8_t totavg, uint8_t movavg)
                         break;
                 }
         }
+
+        (void)k_mutex_unlock(&lock);
+
+        return status;
+}
+
+int spectro_set_moving_avg_n(uint8_t n)
+{
+        int status;
+        struct sensor_value val;
+        val.val1 = n;
+
+        (void)k_mutex_lock(&lock, K_FOREVER);
+
+        status = sensor_attr_set(
+                dev, SENSOR_CHAN_VOLTAGE,
+                (enum sensor_attribute)SENSOR_ATTR_BOFP1_MOVING_AVG_N, &val);
+
+        (void)k_mutex_unlock(&lock);
+
+        return status;
+}
+
+int spectro_set_total_avg_n(uint8_t n)
+{
+        int status;
+        struct sensor_value val;
+        val.val1 = n;
+
+        (void)k_mutex_lock(&lock, K_FOREVER);
+
+        status = sensor_attr_set(
+                dev, SENSOR_CHAN_VOLTAGE,
+                (enum sensor_attribute)SENSOR_ATTR_BOFP1_TOTAL_AVG_N, &val);
+
+        (void)k_mutex_unlock(&lock);
 
         return status;
 }

@@ -105,4 +105,13 @@ begin
         end if;
     end process p_get;
 
+    p_rst: process(wr_clk)
+    begin
+        if rising_edge(wr_clk) then
+            if rst = '1' then
+                uvvm_fifo_flush(r_fifo);
+            end if;
+        end if;
+    end process p_rst;
+
 end architecture bhv;

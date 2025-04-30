@@ -158,7 +158,7 @@ static void bofp1_submit_fetch(struct rtio_iodev_sqe *iodev_sqe)
         flush_reg[1] = 0;
 
         rtio_sqe_prep_tiny_write(sqe, data->iodev_bus, RTIO_PRIO_HIGH,
-                flush_reg, sizeof(flush_reg), NULL);
+                                 flush_reg, sizeof(flush_reg), NULL);
 
         rtio_submit(data->rtio_ctx, 0);
 

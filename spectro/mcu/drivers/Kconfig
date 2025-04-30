@@ -1,4 +1,3 @@
 
-rsource "adc/Kconfig"
 rsource "sensor/Kconfig"
 rsource "light/Kconfig"

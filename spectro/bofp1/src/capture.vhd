@@ -58,6 +58,7 @@ architecture behaviour of capture is
     signal r_moving_avg_data_out: std_logic_vector(r_ccd_data_out'range);
     signal r_moving_avg_busy_in: std_logic;
     signal r_moving_avg_busy_out: std_logic;
+    signal r_moving_avg_en: std_logic;
 
     signal r_dc_rdy_in: std_logic;
     signal r_dc_rdy_out: std_logic;
@@ -66,6 +67,7 @@ architecture behaviour of capture is
     signal r_dc_busy_in: std_logic;
     signal r_dc_busy_out: std_logic;
     signal r_dc_calib: std_logic;
+    signal r_dc_en: std_logic;
 
     signal r_pl_rdy: std_logic;
     signal r_pl_busy: std_logic;
@@ -142,7 +144,7 @@ begin
             i_rst_n => i_rst_n,
             i_n => get_reg(i_regmap, REG_TOTAL_AVG_N)(3 downto 0),
             i_data => r_ccd_data_out,
-            i_en => r_ccd_busy_out,
+            i_en => r_ccd_busy_out and r_total_avg_en,
             i_rdy => r_ccd_rdy_out,
             o_data => r_total_avg_data_out,
             o_rdy => r_total_avg_rdy_out,
@@ -172,7 +174,7 @@ begin
             i_clk => i_clk,
             i_rst_n => i_rst_n,
             i_n => get_reg(i_regmap, REG_MOVING_AVG_N)(3 downto 0),
-            i_en => r_moving_avg_busy_in,
+            i_en => r_moving_avg_busy_in and r_moving_avg_en,
             i_rdy => r_moving_avg_rdy_in,
             i_data => r_moving_avg_data_in,
             o_busy => r_moving_avg_busy_out,
@@ -194,7 +196,8 @@ begin
             i_data_pl => r_moving_avg_data_out,
             o_rdy => r_dc_rdy_in,
             o_busy => r_dc_busy_in,
-            o_data => r_dc_data_in
+            o_data => r_dc_data_in,
+            o_en => r_moving_avg_en
         );
 
     u_dark_current: entity work.dark_current
@@ -202,7 +205,7 @@ begin
             i_clk => i_clk,
             i_rst_n => i_rst_n,
             i_calib => i_dc_calib,
-            i_en => r_dc_busy_in,
+            i_en => r_dc_busy_in and r_dc_en,
             i_rdy => r_dc_rdy_in,
             i_data => r_dc_data_in,
             o_rdy => r_dc_rdy_out,
@@ -225,7 +228,8 @@ begin
             i_data_pl => r_dc_data_out,
             o_rdy => r_pl_rdy,
             o_busy => r_pl_busy,
-            o_data => r_pl_data
+            o_data => r_pl_data,
+            o_en => r_dc_en
         );
 
     u_fifo_pl: entity work.frame_fifo

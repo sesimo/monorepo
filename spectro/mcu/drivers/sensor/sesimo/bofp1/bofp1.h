@@ -24,6 +24,7 @@
 #define BOFP1_REG_TOTAL_AVG_N  (0x9) /* Number of frames for total average */
 #define BOFP1_REG_STATUS       (0xa) /* Status register */
 #define BOFP1_REG_DC_CALIB     (0xb) /* Trigger DC calibration*/
+#define BOFP1_REG_FLUSH        (0xc) /* Flush CCD array */
 
 #define BOFP1_PRC_WMARK_SRC  (0x0)
 #define BOFP1_PRC_BUSY_SRC   (0x1)

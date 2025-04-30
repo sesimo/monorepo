@@ -126,6 +126,8 @@ static void bofp1_submit_fetch(struct rtio_iodev_sqe *iodev_sqe)
         size_t req_len;
         size_t real_len;
         struct bofp1_rtio_header header;
+        struct rtio_sqe *sqe;
+        uint8_t flush_reg[2];
 
         status = light_off(cfg->light);
         if (status != 0) {
@@ -149,7 +151,20 @@ static void bofp1_submit_fetch(struct rtio_iodev_sqe *iodev_sqe)
         data->iodev_sqe = iodev_sqe;
         data->wr_index = 0;
 
+        sqe = rtio_sqe_acquire(data->rtio_ctx);
+        __ASSERT_NO_MSG(sqe != NULL);
+
+        flush_reg[0] = BOFP1_WRITE_REG(BOFP1_REG_FLUSH);
+        flush_reg[1] = 0;
+
+        rtio_sqe_prep_tiny_write(sqe, data->iodev_bus, RTIO_PRIO_HIGH,
+                flush_reg, sizeof(flush_reg), NULL);
+
+        rtio_submit(data->rtio_ctx, 0);
+
+        /* The light timeout is more than enough to flush */
         k_work_reschedule(&data->light_wait_work, LIGHT_TIMEOUT);
+
         return;
 
 error:

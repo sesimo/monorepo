@@ -6,6 +6,9 @@ use ieee.numeric_std.all;
 use work.ctrl_common.all;
 
 entity dark_current is
+    generic (
+        C_UNDERFLOW_THRESHOLD: integer := 300
+    );
     port (
         i_clk: in std_logic;
         i_rst_n: in std_logic;
@@ -90,11 +93,18 @@ begin
             set_err(o_errors, ERR_DC_UNDERFLOW, '0');
 
             if r_state = S_CALC then
-                if unsigned(r_loaded) > unsigned(i_data) then
-                    set_err(o_errors, ERR_DC_UNDERFLOW, '1');
-                end if;
-
                 r_calced <= unsigned(i_data) - unsigned(r_loaded);
+
+                if unsigned(r_loaded) > unsigned(i_data) then
+                    -- A small difference, where the measured dark current
+                    -- happens to be slightly higher than the measured value,
+                    -- is treated as no light being present on the pixel.
+                    if unsigned(i_data) + C_UNDERFLOW_THRESHOLD >= unsigned(r_loaded) then
+                        r_calced <= (others => '0');
+                    else
+                        set_err(o_errors, ERR_DC_UNDERFLOW, '1');
+                    end if;
+                end if;
             end if;
         end if;
     end process p_calc;

@@ -261,13 +261,11 @@ begin
     -- (not dummy element), and not when flushing.
     p_rdy: process(all)
     begin
-        if i_rst_n = '0' then
-            o_data_rdy <= '0';
-        elsif not r_flush then
+        o_data_rdy <= '0';
+
+        if i_rst_n /= '0' and not r_flush then
             if unsigned(r_pix_cnt) >= c_first and unsigned(r_pix_cnt) < c_last then
                 o_data_rdy <= r_adc_done;
-            else
-                o_data_rdy <= '0';
             end if;
         end if;
     end process p_rdy;

@@ -25,28 +25,19 @@ struct spectro_q_entry {
         void *user_arg;
 };
 
-static struct sensor_decode_context decode_ctx = SENSOR_DECODE_CONTEXT_INIT(
-        NULL, (uint8_t *)spectro_buf, SENSOR_CHAN_VOLTAGE, 0);
+static const enum sensor_channel channel =
+        (enum sensor_channel)SENSOR_CHAN_BOFP1_INTENSITY;
+static struct sensor_decode_context decode_ctx =
+        SENSOR_DECODE_CONTEXT_INIT(NULL, (uint8_t *)spectro_buf, channel, 0);
 
 K_MUTEX_DEFINE(lock);
 
 K_MSGQ_DEFINE(msgq, sizeof(struct spectro_q_entry), 2, 1);
 
-/** @brief Convert @p src with shift @p m to a float */
-#define Q31_TO_F(src, m) ((float)(((int64_t)src) << m) / (float)(1U << 31))
-#define F_TO_31(src, shift)                                                    \
-        ((q31_t)CLAMP(((int64_t)(src * (1 << 31)) << shift), INT32_MIN,        \
-                      INT32_MAX))
-
-/** @brief Converts the voltage in @p to millivolts */
-static uint16_t convert_voltage(q31_t q, uint8_t shift)
+/** @brief Converts the scale from Q format */
+static uint16_t convert_scale(q31_t q, uint8_t shift)
 {
-        static int val = 0;
-        return val++;
-
-        int64_t millivolts = ((int64_t)(q * INT64_C(1000)) << shift);
-
-        return millivolts / (1 << 31);
+        return (uint16_t)(((int64_t)q << shift) / (1ULL << 31));
 }
 
 int spectro_stream_read(void *buf_arg, size_t size_arg, size_t *real_size)
@@ -90,7 +81,7 @@ int spectro_stream_read(void *buf_arg, size_t size_arg, size_t *real_size)
                         goto exit;
                 }
 
-                value = convert_voltage(data.readings[0].voltage, data.shift);
+                value = convert_scale(data.readings[0].value, data.shift);
                 sys_put_le16(value, buf);
 
                 size -= sizeof(uint16_t);
@@ -131,7 +122,7 @@ uint32_t spectro_get_int_time(void)
         struct sensor_value val;
 
         (void)sensor_attr_get(
-                dev, SENSOR_CHAN_VOLTAGE,
+                dev, channel,
                 (enum sensor_attribute)SENSOR_ATTR_BOFP1_INTEGRATION, &val);
 
         return val.val1 / 1000;
@@ -146,7 +137,7 @@ int spectro_set_int_time(uint32_t int_us)
 
         val.val1 = int_us * 1000;
         status = sensor_attr_set(
-                dev, SENSOR_CHAN_VOLTAGE,
+                dev, channel,
                 (enum sensor_attribute)SENSOR_ATTR_BOFP1_INTEGRATION, &val);
 
         (void)k_mutex_unlock(&lock);
@@ -172,7 +163,7 @@ int spectro_set_pipeline_ctrl(uint8_t dc, uint8_t totavg, uint8_t movavg)
 
         for (i = 0; i < ARRAY_SIZE(values); i++) {
                 sensor_val.val1 = values[i].val;
-                status = sensor_attr_set(dev, SENSOR_CHAN_VOLTAGE,
+                status = sensor_attr_set(dev, channel,
                                          (enum sensor_attribute)values[i].attr,
                                          &sensor_val);
                 if (status != 0) {
@@ -194,7 +185,7 @@ int spectro_set_moving_avg_n(uint8_t n)
         (void)k_mutex_lock(&lock, K_FOREVER);
 
         status = sensor_attr_set(
-                dev, SENSOR_CHAN_VOLTAGE,
+                dev, channel,
                 (enum sensor_attribute)SENSOR_ATTR_BOFP1_MOVING_AVG_N, &val);
 
         (void)k_mutex_unlock(&lock);
@@ -211,7 +202,7 @@ int spectro_set_total_avg_n(uint8_t n)
         (void)k_mutex_lock(&lock, K_FOREVER);
 
         status = sensor_attr_set(
-                dev, SENSOR_CHAN_VOLTAGE,
+                dev, channel,
                 (enum sensor_attribute)SENSOR_ATTR_BOFP1_TOTAL_AVG_N, &val);
 
         (void)k_mutex_unlock(&lock);

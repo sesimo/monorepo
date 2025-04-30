@@ -243,7 +243,7 @@ static int bofp1_attr_get(const struct device *dev, enum sensor_channel chan,
 {
         struct bofp1_data *data = dev->data;
 
-        if (chan != SENSOR_CHAN_VOLTAGE) {
+        if (chan != (enum sensor_channel)SENSOR_CHAN_BOFP1_INTENSITY) {
                 return -EINVAL;
         }
 
@@ -281,7 +281,7 @@ static int bofp1_attr_set(const struct device *dev, enum sensor_channel chan,
         uint8_t movavg_ena;
         uint8_t totavg_ena;
 
-        if (chan != SENSOR_CHAN_VOLTAGE) {
+        if (chan != (enum sensor_channel)SENSOR_CHAN_BOFP1_INTENSITY) {
                 return -EINVAL;
         }
 

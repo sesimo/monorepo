@@ -2,17 +2,17 @@
 #include <zephyr/drivers/sensor.h>
 #include <zephyr/sys/byteorder.h>
 
+#include <drivers/sensor/bofp1.h>
+
 #include "bofp1.h"
 
 static q31_t to_q31(uint16_t value, int shift)
 {
-        /* Convert to Q31 format and divide the millivolts into volts
-         * TODO: Move this conversion to the FPGA */
-        int64_t upscaled = (int64_t)value * (1ULL << 31);
-        int64_t div = (1 << shift) * INT64_C(1000);
-        int64_t inter = upscaled / div;
+        /* Convert to Q31 format to conform to the sensor API */
+        int64_t upscaled = (int64_t)value * INT64_C(1ULL << 31);
+        int64_t shifted = upscaled >> shift;
 
-        return CLAMP(inter, INT32_MIN, INT32_MAX);
+        return CLAMP(shifted, INT32_MIN, INT32_MAX);
 }
 
 static int bofp1_decode(const uint8_t *buf, struct sensor_chan_spec chan,
@@ -22,7 +22,9 @@ static int bofp1_decode(const uint8_t *buf, struct sensor_chan_spec chan,
         const uint8_t *ptr;
         uint16_t value;
 
-        if (chan.chan_type != SENSOR_CHAN_VOLTAGE || chan.chan_idx != 0) {
+        if (chan.chan_type !=
+                    (enum sensor_channel)SENSOR_CHAN_BOFP1_INTENSITY ||
+            chan.chan_idx != 0) {
                 return -ENOTSUP;
         }
 
@@ -33,8 +35,8 @@ static int bofp1_decode(const uint8_t *buf, struct sensor_chan_spec chan,
         ptr = buf + sizeof(struct bofp1_rtio_header) + *fit * sizeof(uint16_t);
         value = sys_get_be16(ptr);
 
-        data->shift = 10;
-        data->readings[0].voltage = to_q31(value, data->shift);
+        data->shift = 16;
+        data->readings[0].value = to_q31(value, data->shift);
 
         *fit += 1;
 
@@ -44,7 +46,9 @@ static int bofp1_decode(const uint8_t *buf, struct sensor_chan_spec chan,
 static int bofp1_get_size_info(struct sensor_chan_spec chan, size_t *base_size,
                                size_t *frame_size)
 {
-        if (chan.chan_type != SENSOR_CHAN_VOLTAGE || chan.chan_idx != 0) {
+        if (chan.chan_type !=
+                    (enum sensor_channel)SENSOR_CHAN_BOFP1_INTENSITY ||
+            chan.chan_idx != 0) {
                 return -ENOTSUP;
         }
 
@@ -60,7 +64,9 @@ static int bofp1_get_frame_count(const uint8_t *buf,
 {
         struct bofp1_rtio_header header;
 
-        if (chan.chan_type != SENSOR_CHAN_VOLTAGE || chan.chan_idx != 0) {
+        if (chan.chan_type !=
+                    (enum sensor_channel)SENSOR_CHAN_BOFP1_INTENSITY ||
+            chan.chan_idx != 0) {
                 return -ENOTSUP;
         }
 

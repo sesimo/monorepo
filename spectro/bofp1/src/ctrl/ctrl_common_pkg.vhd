@@ -16,7 +16,8 @@ package ctrl_common is
         REG_MOVING_AVG_N,
         REG_TOTAL_AVG_N,
         REG_STATUS,
-        REG_DC_CALIB
+        REG_DC_CALIB,
+        REG_FLUSH
     );
     constant t_reg_len: integer := t_reg'pos(t_reg'high) + 1;
 

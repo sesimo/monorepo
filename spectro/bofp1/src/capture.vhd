@@ -32,6 +32,7 @@ entity capture is
         o_fifo_pl_data: out std_logic_vector(15 downto 0);
 
         i_dc_calib: in std_logic;
+        i_ccd_flush: in std_logic;
 
         o_busy: out std_logic;
         o_fifo_wmark: out std_logic;
@@ -97,6 +98,7 @@ begin
         port map(
             i_clk => i_clk,
             i_rst_n => i_rst_n,
+            i_flush => i_ccd_flush,
             i_start => r_ccd_start,
             i_sh_div => get_reg(i_regmap, REG_SHDIV1) &
                         get_reg(i_regmap, REG_SHDIV2) &

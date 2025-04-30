@@ -50,6 +50,8 @@ architecture structural of bofp1 is
     signal r_fifo_pl_data: std_logic_vector(15 downto 0);
     signal r_fifo_raw_data: std_logic_vector(15 downto 0);
 
+    signal r_ccd_flush: std_logic;
+
     -- Generated clocks
     signal r_adc_sclk2: std_logic;
     signal r_clk_main: std_logic;
@@ -105,6 +107,7 @@ begin
             o_fifo_pl_data => r_fifo_pl_data,
             o_fifo_raw_data => r_fifo_raw_data,
 
+            i_ccd_flush => r_ccd_flush,
             i_dc_calib => r_dc_calib,
 
             o_fifo_wmark => o_fifo_wmark,
@@ -129,6 +132,7 @@ begin
             o_fifo_raw_rd => r_fifo_raw_rd,
 
             o_dc_calib => r_dc_calib,
+            o_ccd_flush => r_ccd_flush,
 
             i_errors => r_errors,
             io_regmap => r_regmap

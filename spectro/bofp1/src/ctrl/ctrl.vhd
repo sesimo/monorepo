@@ -24,6 +24,7 @@ entity ctrl is
         o_fifo_pl_rd: out std_logic;
 
         o_dc_calib: out std_logic;
+        o_ccd_flush: out std_logic;
 
         i_errors: in t_err_bitmap;
         io_regmap: inout t_regmap
@@ -253,6 +254,7 @@ begin
         if rising_edge(i_clk) then
             o_ccd_sample <= '0';
             o_rst <= '0';
+            o_ccd_flush <= '0';
             o_dc_calib <= '0';
             r_err_clear <= '0';
 
@@ -273,6 +275,9 @@ begin
 
                     when REG_STATUS =>
                         r_err_clear <= '1';
+
+                    when REG_FLUSH =>
+                        o_ccd_flush <= '1';
 
                     when REG_SHDIV1 | REG_SHDIV2 | REG_SHDIV3
                          | REG_PRC_CONTROL | REG_TOTAL_AVG_N

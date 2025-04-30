@@ -18,6 +18,7 @@ entity tcd1304 is
         i_clk: in std_logic;
         i_rst_n: in std_logic;
         i_start: in std_logic;
+        i_flush: in std_logic;
         i_sh_div: in std_logic_vector(23 downto 0);
 
         i_adc_eoc: in std_logic;
@@ -46,6 +47,8 @@ architecture rtl of tcd1304 is
 
     constant c_mclk_count: integer := G_CLK_FREQ / 800_000;
     constant c_mclk_pulse: integer := c_mclk_count / 2;
+
+    signal r_flush: boolean;
 
     signal r_icg_buf: std_logic;
 
@@ -206,6 +209,19 @@ begin
             o_roll => r_icg_rolled
         );
 
+    p_flush: process(i_clk)
+    begin
+        if rising_edge(i_clk) then
+            if i_rst_n = '0' then
+                r_flush <= false;
+            elsif i_flush = '1' then
+                r_flush <= true;
+            elsif r_flush and r_state = S_IDLE then
+                r_flush <= false;
+            end if;
+        end if;
+    end process p_flush;
+
     p_state: process(i_clk)
     begin
         if rising_edge(i_clk) then
@@ -214,7 +230,7 @@ begin
             else
                 case r_state is
                     when S_IDLE =>
-                        if i_start = '1' then
+                        if i_start = '1' or i_flush = '1' then
                             r_state <= S_SYNCING;
                         end if;
 
@@ -242,12 +258,12 @@ begin
     end process p_state;
 
     -- Only drive the ready signal when reading an effective element
-    -- (not dummy element).
+    -- (not dummy element), and not when flushing.
     p_rdy: process(all)
     begin
         if i_rst_n = '0' then
             o_data_rdy <= '0';
-        else
+        elsif not r_flush then
             if unsigned(r_pix_cnt) >= c_first and unsigned(r_pix_cnt) < c_last then
                 o_data_rdy <= r_adc_done;
             else
@@ -258,7 +274,7 @@ begin
 
     r_data_read <= r_data_enable when r_state = S_CAPTURE else '0';
     r_icg_buf <= '1' when r_state = S_ICG else '0';
-    o_busy <= '0' when r_state = S_IDLE else '1';
+    o_busy <= '0' when (r_state = S_IDLE or r_flush) else '1';
     o_pin_icg <= r_icg_buf;
     o_pin_mclk <= r_mclk_buf;
     o_pin_sh <= r_sh_delayed;

@@ -18,6 +18,13 @@ USB_MSG_DIR_OFFSET = 7
 # Vendor specific requests
 VREQ_BEGIN_READ = 0x1
 VREQ_INTEGRATION_TIME = 0x2
+VREQ_PL_CTRL = 0x3
+VREQ_MOVING_AVG_N = 0x4
+VREQ_TOTAL_AVG_N = 0x5
+
+PL_CTRL_DC_OFFSET = 0
+PL_CTRL_MOVAVG_OFFSET = 1
+PL_CTRL_TOTAVG_OFFSET = 2
 
 DATA_COUNT = 3648
 DATA_SIZE = DATA_COUNT * 2
@@ -78,6 +85,33 @@ class Device:
         self._ctrl_message(
             VREQ_INTEGRATION_TIME, data, direction=USB_MSG_DIR_DEV)
 
+    @property
+    def moving_avg_n(self) -> int:
+        pass
+
+    @moving_avg_n.setter
+    def moving_avg_n(self, val: int) -> None:
+        data = struct.pack('<B', val)
+        self._ctrl_message(VREQ_MOVING_AVG_N, data, direction=USB_MSG_DIR_DEV)
+
+    @property
+    def total_avg_n(self) -> int:
+        pass
+
+    @total_avg_n.setter
+    def total_avg_n(self, val: int) -> None:
+        data = struct.pack('<B', val)
+        self._ctrl_message(VREQ_TOTAL_AVG_N, data, direction=USB_MSG_DIR_DEV)
+
+    def _set_pl_ctrl(self, dc: bool, movavg: bool,
+                     totavg: bool) -> None:
+        mask = ((dc << PL_CTRL_DC_OFFSET) |
+                (movavg << PL_CTRL_MOVAVG_OFFSET) |
+                (totavg << PL_CTRL_TOTAVG_OFFSET))
+        data = struct.pack('<B', mask)
+
+        self._ctrl_message(VREQ_PL_CTRL, data, direction=USB_MSG_DIR_DEV)
+
     def _begin_read(self) -> None:
         self._ctrl_message(VREQ_BEGIN_READ)
 
@@ -85,10 +119,12 @@ class Device:
         return usb.util.find_descriptor(self.intf,
                                         custom_match=_ep_find_kind(kind))
 
-    def read_frame(self) -> Frame:
+    def read_frame(self, dc: bool = True, movavg: bool = True,
+                   totavg: bool = True) -> Frame:
+        self._set_pl_ctrl(dc=dc, movavg=movavg, totavg=totavg)
         self._begin_read()
 
         ep = self._get_ep(usb.util.ENDPOINT_IN)
         data = ep.read(DATA_SIZE, timeout=self._timeout_ms)
 
-        return Frame(struct.unpack(f'<{DATA_COUNT}H', data))
+        return Frame(struct.unpack(f'<{len(data)//2}H', data))

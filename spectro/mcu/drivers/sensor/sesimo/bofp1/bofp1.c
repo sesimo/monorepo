@@ -103,6 +103,11 @@ static int bofp1_set_integration_time(const struct device *dev,
         key = k_spin_lock(&data->lock);
 
         freq = 1000000000UL / time_ns;
+        if (freq == 0) {
+                LOG_ERR("Integration time %" PRIu32 " is too high.", time_ns);
+                status = -EINVAL;
+                goto exit;
+        }
 
         div = bofp1_sh_div(dev, freq);
         if (div > (1 << 24) - 1) {

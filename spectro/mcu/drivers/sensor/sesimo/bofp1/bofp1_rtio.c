@@ -314,7 +314,7 @@ static void bofp1_data_read(const struct device *dev)
                         rtio_sqe_prep_callback(cb_action, bofp1_rtio_err,
                                                (void *)dev, NULL);
                         rtio_submit(data->rtio_ctx, 0);
-                        goto exit;
+                        return;
                 }
         }
 

@@ -202,6 +202,11 @@ static void bofp1_rtio_finish(struct rtio *r, const struct rtio_sqe *sqe,
         const struct device *dev = dev_arg;
         struct bofp1_data *data = dev->data;
 
+        if (data->status_raw != 0) {
+                LOG_WRN("read produced errors: 0x%x",
+                        (uint32_t)data->status_raw);
+        }
+
         bofp1_finish(dev_arg, atomic_get(&data->status));
 }
 
@@ -284,7 +289,10 @@ static void bofp1_data_read(const struct device *dev)
         size_t size;
         size_t index;
         uint8_t reg[2];
+        uint8_t status_reg;
         struct rtio_sqe *wr_reg;
+        struct rtio_sqe *wr_status;
+        struct rtio_sqe *rd_status;
         struct rtio_sqe *rd_data;
         struct rtio_sqe *cb_action;
 
@@ -314,25 +322,41 @@ static void bofp1_data_read(const struct device *dev)
 
         wr_reg = rtio_sqe_acquire(data->rtio_ctx);
         rd_data = rtio_sqe_acquire(data->rtio_ctx);
+        wr_status = rtio_sqe_acquire(data->rtio_ctx);
+        rd_status = rtio_sqe_acquire(data->rtio_ctx);
         cb_action = rtio_sqe_acquire(data->rtio_ctx);
 
-        if (wr_reg == NULL || rd_data == NULL || cb_action == NULL) {
+        if (wr_reg == NULL || rd_data == NULL || cb_action == NULL ||
+            wr_status == NULL || rd_status == NULL) {
                 bofp1_finish(dev, -ENOMEM);
-                goto exit;
+                return;
         }
 
+        /* Read stream data */
         reg[0] = BOFP1_READ_REG(BOFP1_REG_STREAM);
         reg[1] = 0;
         rtio_sqe_prep_tiny_write(wr_reg, data->iodev_bus, RTIO_PRIO_HIGH, reg,
                                  sizeof(reg), NULL);
         rtio_sqe_prep_read(rd_data, data->iodev_bus, RTIO_PRIO_HIGH,
-                           data->wr_buf + index, size, NULL);
+                           data->wr_buf + sizeof(struct bofp1_rtio_header) +
+                                   index,
+                           size, NULL);
 
         wr_reg->flags = RTIO_SQE_TRANSACTION;
         rd_data->flags = RTIO_SQE_CHAINED;
 
+        /* Read status flag */
+        status_reg = BOFP1_READ_REG(BOFP1_REG_STATUS);
+        rtio_sqe_prep_tiny_write(wr_status, data->iodev_bus, RTIO_PRIO_HIGH,
+                                 &status_reg, sizeof(status_reg), NULL);
+        rtio_sqe_prep_read(rd_status, data->iodev_bus, RTIO_PRIO_HIGH,
+                           &data->status_raw, sizeof(data->status_raw), NULL);
+
+        wr_status->flags = RTIO_SQE_TRANSACTION;
+        rd_status->flags = RTIO_SQE_CHAINED;
+
         data->wr_index += size;
-        if (data->wr_index >= bofp1_frame_size()) {
+        if (data->wr_index >= bofp1_frame_size(dev)) {
                 /* Finish up */
                 rtio_sqe_prep_callback(cb_action, bofp1_rtio_finish,
                                        (void *)dev, NULL);

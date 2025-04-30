@@ -79,7 +79,7 @@ struct bofp1_data {
         uint8_t *wr_buf;
         size_t wr_index;
 
-        struct k_spinlock lock;
+        struct k_sem lock;
 
         struct k_work_delayable watchdog_work;
         struct k_work_delayable light_wait_work;

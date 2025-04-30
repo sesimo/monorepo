@@ -188,6 +188,7 @@ static void bofp1_finish(const struct device *dev, int status)
 
         (void)light_off(cfg->light);
         atomic_clear_bit(&data->state, BOFP1_BUSY);
+        k_sem_give(&data->lock);
 
         LOG_INF("done");
 }
@@ -286,14 +287,11 @@ static void bofp1_data_read(const struct device *dev)
         struct rtio_sqe *wr_reg;
         struct rtio_sqe *rd_data;
         struct rtio_sqe *cb_action;
-        k_spinlock_key_t key;
-
-        key = k_spin_lock(&data->lock);
 
         index = data->wr_index;
         if (index >= bofp1_frame_size(dev)) {
                 LOG_WRN("duplicate read detected");
-                goto exit;
+                return;
         }
 
         size = bofp1_frame_size(dev) - index;
@@ -345,9 +343,6 @@ static void bofp1_data_read(const struct device *dev)
         }
 
         rtio_submit(data->rtio_ctx, 0);
-
-exit:
-        k_spin_unlock(&data->lock, key);
 }
 
 static void bofp1_data_read_work(struct rtio_iodev_sqe *iodev_sqe)
@@ -374,8 +369,12 @@ void bofp1_submit(const struct device *dev, struct rtio_iodev_sqe *iodev_sqe)
 {
         struct rtio_work_req *work;
         const struct sensor_read_config *config = iodev_sqe->sqe.iodev->data;
+        struct bofp1_data *data = dev->data;
 
         __ASSERT(!config->is_streaming, "streaming not supported");
+
+        /* Lock must be held for the entire transmission */
+        (void)k_sem_take(&data->lock, K_FOREVER);
 
         work = rtio_work_req_alloc();
         rtio_work_req_submit(work, iodev_sqe, bofp1_submit_fetch);

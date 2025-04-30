@@ -5,6 +5,7 @@
 #include <zephyr/logging/log.h>
 #include <zephyr/drivers/gpio.h>
 #include <zephyr/sys/byteorder.h>
+#include <zephyr/kernel.h>
 
 #include <drivers/sensor/bofp1.h>
 #include <drivers/light.h>
@@ -99,9 +100,8 @@ static int bofp1_set_integration_time(const struct device *dev,
         uint32_t div;
         int status;
         struct bofp1_data *data = dev->data;
-        k_spinlock_key_t key;
 
-        key = k_spin_lock(&data->lock);
+        (void)k_sem_take(&data->lock, K_FOREVER);
 
         freq = 1000000000UL / time_ns;
         if (freq == 0) {
@@ -135,7 +135,7 @@ static int bofp1_set_integration_time(const struct device *dev,
         }
 
 exit:
-        k_spin_unlock(&data->lock, key);
+        k_sem_give(&data->lock);
 
         return status;
 }
@@ -169,11 +169,12 @@ static int bofp1_set_moving_avg_n(const struct device *dev, uint8_t n)
         int status = 0;
         struct bofp1_data *data = dev->data;
 
-        K_SPINLOCK(&data->lock)
-        {
-                status = bofp1_set_reg(dev, BOFP1_REG_MOVING_AVG_N, n);
-                data->moving_avg_n = status == 0 ? n : 0;
-        }
+        (void)k_sem_take(&data->lock, K_FOREVER);
+
+        status = bofp1_set_reg(dev, BOFP1_REG_MOVING_AVG_N, n);
+        data->moving_avg_n = status == 0 ? n : 0;
+
+        k_sem_give(&data->lock);
 
         return status;
 }
@@ -183,11 +184,12 @@ static int bofp1_set_total_avg_n(const struct device *dev, uint8_t n)
         int status = 0;
         struct bofp1_data *data = dev->data;
 
-        K_SPINLOCK(&data->lock)
-        {
-                status = bofp1_set_reg(dev, BOFP1_REG_TOTAL_AVG_N, n);
-                data->total_avg_n = status == 0 ? n : 0;
-        }
+        (void)k_sem_take(&data->lock, K_FOREVER);
+
+        status = bofp1_set_reg(dev, BOFP1_REG_TOTAL_AVG_N, n);
+        data->total_avg_n = status == 0 ? n : 0;
+
+        k_sem_give(&data->lock);
 
         return status;
 }
@@ -204,20 +206,22 @@ static int bofp1_set_prc(const struct device *dev, bool dc_ena, bool movavg_ena,
               (movavg_ena << BOFP1_PRC_MOVAVG_ENA) |
               (totavg_ena << BOFP1_PRC_TOTAVG_ENA);
 
-        K_SPINLOCK(&data->lock)
-        {
-                status = bofp1_read_reg(dev, BOFP1_REG_PRCCTRL, &cur);
-                if (status != 0) {
-                        K_SPINLOCK_BREAK;
-                }
+        (void)k_sem_take(&data->lock, K_FOREVER);
 
-                cur &= ~((1 << BOFP1_PRC_DC_ENA) | (1 << BOFP1_PRC_MOVAVG_ENA) |
-                         (1 << BOFP1_PRC_TOTAVG_ENA));
-                cur |= val;
-
-                status = bofp1_set_reg(dev, BOFP1_REG_PRCCTRL, cur);
-                data->prc = status == 0 ? cur : 0;
+        status = bofp1_read_reg(dev, BOFP1_REG_PRCCTRL, &cur);
+        if (status != 0) {
+                k_sem_give(&data->lock);
+                return status;
         }
+
+        cur &= ~((1 << BOFP1_PRC_DC_ENA) | (1 << BOFP1_PRC_MOVAVG_ENA) |
+                 (1 << BOFP1_PRC_TOTAVG_ENA));
+        cur |= val;
+
+        status = bofp1_set_reg(dev, BOFP1_REG_PRCCTRL, cur);
+        data->prc = status == 0 ? cur : 0;
+
+        k_sem_give(&data->lock);
 
         return status;
 }
@@ -465,6 +469,11 @@ static int bofp1_init(const struct device *dev)
         }
 
         (void)bofp1_rtio_init(dev);
+
+        status = k_sem_init(&data->lock, 1, K_SEM_MAX_LIMIT);
+        if (status != 0) {
+                return status;
+        }
 
         status = light_off(cfg->light);
         if (status != 0) {

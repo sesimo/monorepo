@@ -7,6 +7,7 @@
 #include <zephyr/sys/byteorder.h>
 
 #include <drivers/sensor/bofp1.h>
+#include <drivers/light.h>
 
 #include "bofp1.h"
 
@@ -464,6 +465,11 @@ static int bofp1_init(const struct device *dev)
         }
 
         (void)bofp1_rtio_init(dev);
+
+        status = light_off(cfg->light);
+        if (status != 0) {
+                return status;
+        }
 
         status = bofp1_init_gpio(&cfg->busy_gpios, bofp1_busy_fall_cb,
                                  &data->busy_fall_cb, BIT(cfg->busy_gpios.pin));

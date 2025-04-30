@@ -51,7 +51,7 @@ struct bofp1_cfg {
         struct gpio_dt_spec busy_gpios;
         struct gpio_dt_spec fifo_w_gpios;
 
-        const struct device* light;
+        const struct device *light;
 };
 
 struct bofp1_data {

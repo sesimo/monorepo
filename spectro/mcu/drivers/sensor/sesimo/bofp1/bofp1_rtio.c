@@ -175,6 +175,7 @@ static void bofp1_finish(const struct device *dev, int status)
 {
         struct bofp1_data *data = dev->data;
         struct rtio_iodev_sqe *sqe = data->iodev_sqe;
+        const struct bofp1_cfg *cfg = dev->config;
 
         data->iodev_sqe = NULL;
         data->wr_buf = NULL;
@@ -185,6 +186,7 @@ static void bofp1_finish(const struct device *dev, int status)
                 rtio_iodev_sqe_err(sqe, status);
         }
 
+        (void)light_off(cfg->light);
         atomic_clear_bit(&data->state, BOFP1_BUSY);
 
         LOG_INF("done");

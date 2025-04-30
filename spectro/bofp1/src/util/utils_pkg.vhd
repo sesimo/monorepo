@@ -10,6 +10,8 @@ package utils is
 
     function const_div(dividend: unsigned; divisor: unsigned;
                        bits: integer) return unsigned;
+
+    function bits_needed(w: integer) return integer;
 end package utils;
 
 package body utils is
@@ -55,4 +57,16 @@ package body utils is
         tmp := resize(dividend * div.mul, tmp'length);
         return resize(tmp srl div.shift, dividend'length);
     end function const_div;
+
+    function bits_needed(w: integer) return integer is
+        variable val: real;
+    begin
+        val := log2(real(w));
+
+        if ceil(val) = val then
+            return integer(val) + 1;
+        else
+            return integer(ceil(val));
+        end if;
+    end function bits_needed;
 end package body utils;

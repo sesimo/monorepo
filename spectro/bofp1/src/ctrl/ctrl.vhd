@@ -59,7 +59,6 @@ architecture behaviour of ctrl is
     signal r_reg_raw: std_logic_vector(7 downto 0);
     signal r_reg_rdy: std_logic;
 
-    signal r_errors: t_err_bitmap;
     signal r_err_clear: std_logic;
 
     signal r_fifo_rd: std_logic;
@@ -82,7 +81,7 @@ begin
             i_clk => i_clk,
             i_rst_n => i_rst_n,
             i_clear => r_err_clear,
-            i_rising => r_errors or i_errors,
+            i_rising => i_errors,
             o_persisted => io_regmap(t_reg'pos(REG_STATUS))(c_err_len-1 downto 0)
         );
 
@@ -259,7 +258,7 @@ begin
             r_err_clear <= '0';
 
             if i_rst_n = '0' then
-                io_regmap <= c_regmap_default;
+                load_defaults(io_regmap);
             elsif r_sample_rolled = '1' and is_write(r_reg_raw) then
                 reg := parse_reg(r_reg_raw);
 

@@ -32,22 +32,9 @@ package ctrl_common is
     subtype t_reg_vector is std_logic_vector(7 downto 0);
     type t_regmap is array(t_reg_len-1 downto 0) of t_reg_vector;
 
-    constant c_regmap_default: t_regmap := (
-        t_reg'pos(REG_SHDIV1) => std_logic_vector(to_unsigned(0, 8)),
-        t_reg'pos(REG_SHDIV2) => std_logic_vector(to_unsigned(0, 8)),
-        t_reg'pos(REG_SHDIV3) => std_logic_vector(to_unsigned(80, 8)),
-        t_reg'pos(REG_MOVING_AVG_N) => std_logic_vector(to_unsigned(1, 8)),
-        t_reg'pos(REG_TOTAL_AVG_N) => std_logic_vector(to_unsigned(2, 8)),
-        t_reg'pos(REG_PRC_CONTROL) => (
-            t_prc_ctrl'pos(PRC_WMARK_SRC) => '0',
-            t_prc_ctrl'pos(PRC_BUSY_SRC) => '0',
-            t_prc_ctrl'pos(PRC_TOTAVG_ENA) => '1',
-            t_prc_ctrl'pos(PRC_MOVAVG_ENA) => '1',
-            t_prc_ctrl'pos(PRC_DC_ENA) => '1',
-            others => '0'
-        ),
-        others => (others => '0')
-    );
+    -- brief Load regmap defaults (unless they are driven from a dedicated process)
+    -- param regmap Regmap to load values into
+    procedure load_defaults(signal regmap: out t_regmap);
     
     -- brief Get the value of register `reg` in `regmap`
     -- param regmap Regmap to read value from
@@ -105,6 +92,23 @@ package ctrl_common is
 end package ctrl_common;
 
 package body ctrl_common is
+    procedure load_defaults(signal regmap: out t_regmap) is
+    begin
+        regmap(t_reg'pos(REG_SHDIV1)) <= std_logic_vector(to_unsigned(0, 8));
+        regmap(t_reg'pos(REG_SHDIV2)) <= std_logic_vector(to_unsigned(0, 8));
+        regmap(t_reg'pos(REG_SHDIV3)) <= std_logic_vector(to_unsigned(80, 8));
+        regmap(t_reg'pos(REG_MOVING_AVG_N)) <= std_logic_vector(to_unsigned(1, 8));
+        regmap(t_reg'pos(REG_TOTAL_AVG_N)) <= std_logic_vector(to_unsigned(2, 8));
+        regmap(t_reg'pos(REG_PRC_CONTROL)) <= (
+            t_prc_ctrl'pos(PRC_WMARK_SRC) => '1',
+            t_prc_ctrl'pos(PRC_BUSY_SRC) => '1',
+            t_prc_ctrl'pos(PRC_TOTAVG_ENA) => '1',
+            t_prc_ctrl'pos(PRC_MOVAVG_ENA) => '1',
+            t_prc_ctrl'pos(PRC_DC_ENA) => '1',
+            others => '0'
+        );
+    end procedure load_defaults;
+
     function get_reg(regmap: t_regmap; reg: t_reg) return t_reg_vector is
     begin
         return regmap(t_reg'pos(reg));

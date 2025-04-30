@@ -196,6 +196,7 @@ static int bofp1_set_prc(const struct device *dev, bool dc_ena, bool movavg_ena,
 {
         int status = 0;
         uint8_t val;
+        uint8_t cur;
         struct bofp1_data *data = dev->data;
 
         val = (dc_ena << BOFP1_PRC_DC_ENA) |
@@ -204,8 +205,17 @@ static int bofp1_set_prc(const struct device *dev, bool dc_ena, bool movavg_ena,
 
         K_SPINLOCK(&data->lock)
         {
-                status = bofp1_set_reg(dev, BOFP1_REG_PRCCTRL, val);
-                data->prc = status == 0 ? val : 0;
+                status = bofp1_read_reg(dev, BOFP1_REG_PRCCTRL, &cur);
+                if (status != 0) {
+                        K_SPINLOCK_BREAK;
+                }
+
+                cur &= ~((1 << BOFP1_PRC_DC_ENA) | (1 << BOFP1_PRC_MOVAVG_ENA) |
+                         (1 << BOFP1_PRC_TOTAVG_ENA));
+                cur |= val;
+
+                status = bofp1_set_reg(dev, BOFP1_REG_PRCCTRL, cur);
+                data->prc = status == 0 ? cur : 0;
         }
 
         return status;

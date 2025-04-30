@@ -32,8 +32,13 @@ begin
     clock_generator(sclk_adc, r_clkena_sclk, calc_period(16_666_667), "ADC SCLK");
     clock_generator(sclk2_adc, r_clkena_sclk2, calc_period(16_666_667*2), "ADC SCLK2");
 
-    r_clkena_main <= true;
-    r_clkena_sclk <= true;
-    r_clkena_sclk2 <= true;
+    p_enable: process(clk_in1)
+    begin
+        if rising_edge(clk_in1) then
+            r_clkena_main <= true;
+            r_clkena_sclk <= true;
+            r_clkena_sclk2 <= true;
+        end if;
+    end process p_enable;
 
 end architecture behaviour;

@@ -15,7 +15,7 @@ use bitvis_vip_spi.spi_bfm_pkg.all;
 entity tb_bofp1 is
     generic (
         G_CLK_FREQ: integer := 100_000_000;
-        G_SCLK_DIV: integer := 7
+        G_SCLK_DIV: integer := 13
     );
 end entity tb_bofp1;
 
@@ -53,15 +53,16 @@ architecture bhv of tb_bofp1 is
     constant c_reg_total_avg_n: std_logic_vector(7 downto 0) := x"89";
     constant c_reg_status: std_logic_vector(7 downto 0) := x"8a";
     constant c_reg_dc_calib: std_logic_vector(15 downto 0) := x"8b00";
+    constant c_reg_flush: std_logic_Vector(15 downto 0) := x"8c00";
 
     constant c_clk_period: time := (1.0 / real(G_CLK_FREQ)) * (1 sec);
     constant c_sclk_period: time := c_clk_period * G_SCLK_DIV;
 
-    constant c_ccd_pix_count: integer := 364;
+    constant c_ccd_pix_count: integer := 368;
     constant c_val_base: integer := 3000;
     constant c_dc_base: integer := 4000;
 
-    constant c_total_avg_n: integer := 9;
+    constant c_total_avg_n: integer := 5;
     constant c_moving_avg_n: integer := 3;
     constant c_moving_avg_n_sum: integer := c_moving_avg_n * 2 + 1;
 
@@ -384,7 +385,7 @@ begin
             variable val: unsigned(15 downto 0);
         begin
             for i in 1 to c_moving_avg_n_sum-1 loop
-                val := to_unsigned(calc_dc_val(i-1), val'length);
+                val := to_unsigned(32+calc_dc_val(i-1), val'length);
                 ret := ret(ret'high-1 downto 0) & val;
             end loop;
 
@@ -410,10 +411,13 @@ begin
 
                 pl_val := pl_val - dc;
 
-                if idx < c_ccd_pix_count - c_moving_avg_n_sum then
-                    check_value(
-                        data(head downto head-15),
-                        std_logic_vector(pl_val),
+                if idx < c_ccd_pix_count - 48 - c_moving_avg_n_sum then
+                    -- Because we divide by multiplying, we may sometimes
+                    -- be one off. This is good enough.
+                    check_value_in_range(
+                        to_integer(unsigned(data(head downto head-15))),
+                        to_integer(pl_val-1),
+                        to_integer(pl_val+1),
                         "Check pipeline reading: " & integer'image(idx)
                     );
                 end if;
@@ -470,15 +474,23 @@ begin
 
         procedure set_prc_ctrl(constant pl: boolean) is
             variable tx_data: std_logic_vector(15 downto 0);
+            variable rx_data: std_logic_vector(tx_data'range);
             variable pl_cast: std_logic;
         begin
             pl_cast := '1' when pl else '0';
             tx_data(tx_data'high downto tx_data'high-7) := c_reg_prc_ctrl;
-            tx_data(7 downto 0) := (
-                0 => pl_cast, -- Watermark src
-                1 => pl_cast, -- Busy src
-                others => '0'
+
+            spi_master_transmit_and_receive(
+                "0" & tx_data(tx_data'high-1 downto 0),
+                rx_data,
+                "Get PRC register",
+                r_spi_sub_if,
+                config => r_spi_conf
             );
+
+            tx_data(7 downto 0) := rx_data(7 downto 0);
+            tx_data(0) := pl_cast;
+            tx_data(1) := pl_cast;
 
             spi_master_transmit(
                 tx_data,
@@ -515,7 +527,8 @@ begin
             variable count: integer;
 
             constant cnt_per_read: integer := 256 / 16 - 1;
-            constant num_iter: integer := c_ccd_pix_count / cnt_per_read;
+            constant num_pix: integer := c_ccd_pix_count - 48;
+            constant num_iter: integer := num_pix / cnt_per_read;
         begin
             -- Set the watermark and busy source. On the last frame readout, the
             -- watermark source is set to the pipeline FIFO, which comes a
@@ -527,17 +540,20 @@ begin
                 wait until r_ccd_busy = '1';
             end if;
 
-            pl_noise := 0;
-            pl_cycles := 0;
+            pl_noise := 32 mod 10;
+            pl_cycles := 32;
             init_pl_window(pl_moving_avg_window);
+
+            ccd_cycles := 32;
+            ccd_noise := 32 mod 10;
 
             for i in 0 to num_iter loop
                 if r_ccd_busy = '1' then
                     wait until r_fifo_wmark = '1' or r_ccd_busy = '0';
                 end if;
 
-                if offset >= c_ccd_pix_count - cnt_per_read then
-                    count := c_ccd_pix_count - offset;
+                if offset >= num_pix - cnt_per_read then
+                    count := num_pix - offset;
                 else
                     count := cnt_per_read;
                 end if;
@@ -553,10 +569,6 @@ begin
                 -- Ensure CS is released between
                 wait for 1 ps;
             end loop;
-
-            ccd_cycles := 0;
-            ccd_noise := 0;
-            wait for 1 ps;
         end procedure check_frame;
 
         procedure do_dc_calib is
@@ -574,9 +586,6 @@ begin
                 config => r_spi_conf
             );
             wait until r_ccd_busy = '0';
-
-            ccd_cycles := 0;
-            ccd_noise := 0;
 
             r_dc_calib <= false;
         end procedure do_dc_calib;
@@ -608,6 +617,21 @@ begin
         ------------------------------------------------------------------------
         r_rst_n <= '1';
         wait for 1 ps;
+
+        spi_master_transmit(
+            c_reg_flush,
+            "Test flushing",
+            r_spi_sub_if,
+            config => r_spi_conf
+        );
+        wait for 2 ms;
+
+        spi_master_transmit(
+            x"88010800",
+            "Test readout",
+            r_spi_sub_if,
+            config => r_spi_conf
+        );
 
         set_moving_avg_n(c_moving_avg_n);
         set_total_avg_n(c_total_avg_n);

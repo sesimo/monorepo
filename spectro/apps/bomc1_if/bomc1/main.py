@@ -15,11 +15,10 @@ def _do_sum_average(frames: np.array) -> np.array:
 
 
 def _do_moving_average(frame: np.array) -> np.array:
-    n = 10
+    n = 5
     frame = np.cumsum(frame)
     frame[n:] = frame[n:] - frame[:-n]
     r = frame[n-1:] / n
-    print(frame[n-1:].size)
     return r
 
 
@@ -42,21 +41,26 @@ def _do_dark_current(frame: np.array) -> np.array:
 def _do_render(frames: list[Frame], raw: bool, avg_only: bool) -> None:
     # _, axs = plt.subplots(len(frames))
 
-    if not avg_only:
+    if True:
         for idx, x in enumerate(frames):
             # ax = axs[idx] if len(frames) != 1 else axs
             plt.plot(x)
 
-    if not raw:
+    if False:
         avg = _do_sum_average(np.asarray(frames, dtype=np.uint16))
         plt.plot(avg)
         mavg = _do_moving_average(avg)
         plt.plot(mavg)
 
+        n = mavg
+        for _ in range(0):
+            for i in range(10):
+                n = _do_moving_average(n)
+
+            plt.plot(n)
+
         dc = _do_dark_current(mavg)
         plt.plot(dc)
-    else:
-        plt.plot(frames)
 
     plt.show()
 
@@ -71,7 +75,10 @@ def _do_fetch(args: argparse.Namespace) -> None:
     frames: list[Frame] = []
 
     for i in range(args.n):
-        frames.append(dev.read_frame())
+        frames.append(dev.read_frame(dc=not args.no_dc,
+                      movavg=not args.no_movavg, totavg=not args.no_totavg))
+
+    frames.append(dev.read_frame(False, False, False))
 
     if args.save:
         _do_save(frames, args.out)
@@ -98,6 +105,9 @@ def _create_parser() -> argparse.ArgumentParser:
     fetch.add_argument('-s', '--save', action='store_true')
     fetch.add_argument('-r', '--render', action='store_true')
     fetch.add_argument('-o', '--out', type=Path)
+    fetch.add_argument('--no-dc', action='store_true')
+    fetch.add_argument('--no-totavg', action='store_true')
+    fetch.add_argument('--no-movavg', action='store_true')
     fetch.add_argument('--raw', action='store_true')
     fetch.add_argument('--avg-only', action='store_true')
     fetch.set_defaults(func=_do_fetch)

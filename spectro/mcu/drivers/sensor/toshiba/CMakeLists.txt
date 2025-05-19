@@ -1,2 +1,0 @@
-
-add_subdirectory_ifdef(CONFIG_TOSHIBA_TCD1304 tcd1304)

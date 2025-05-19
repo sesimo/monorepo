@@ -1,0 +1,78 @@
+
+include: [base.yaml, spi-device.yaml]
+
+compatible: sesimo,bofp1
+description: Device driver for the SESIMO FPGA CCD Sensor bridge (BOFP1)
+
+properties:
+  clock-frequency:
+    type: int
+    default: 100000000
+    description: |
+      Operating clock frequency (in Hz) for the FPGA. 
+
+  clkdiv:
+    type: int
+    default: 62
+    description: |
+      Clock divider value. The master clock frequency for the CCD is given
+      by `f = clock-frequency / clkdiv`. This can not be changed, and should
+      be the same as the value used on the FPGA.
+
+      Defaults to 62, which gives ~1.6MHz operating frequency.
+
+  integration-time:
+    type: int
+    default: 20000
+    description: |
+      Set integration time (in nanoseconds). The integration time is determined
+      by the periodicity of the SH signal on the FPGA. The frequency of this
+      signal is given by `f = MCLK/((PSC+1) * (SH+1))`, that is, it is
+      dependent on both the MCLK frequency and the PSC value. The integration
+      time attribute only adjusts the SH value, so MCLK and PSC may need
+      to be manually adjusted to obtain the best possible frequnecy.
+
+
+  busy-gpios:
+    description: |
+      GPIO for indicating if the CCD is busy
+    type: phandle-array
+    required: true
+
+  fifo-wmark-gpios:
+    description: |
+      FIFO watermark GPIO (more than 256 elements in the FIFO)
+    type: phandle-array
+    required: true
+
+  dark-current:
+    type: boolean
+    description: Remove dark current from sample
+
+  light:
+    type: phandle
+    description: Light source
+  
+  total-avg:
+    type: boolean
+    description: |
+      Produce one sample from the average of multiple continous samples
+
+  moving-avg:
+    type: boolean
+    description: |
+      Use a moving average window for smoothing each pixel in a sample
+
+  total-avg-n:
+    type: int
+    default: 1
+    description: |
+      Number of frames to capture before returning an average of all of them
+      as a single frame.
+
+  moving-avg-n:
+    type: int
+    default: 1
+    description: |
+      Number of neighbours (on each side) to produce a moving average for each
+      of the pixels in a frame.

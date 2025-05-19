@@ -1,0 +1,16 @@
+
+menuconfig LIGHT
+    bool "Light source drivers"
+    help
+        Include light drivers in system configuration. These are primarily
+        used to adjust the spectrometer light source.
+
+if LIGHT
+
+config LIGHT_INIT_PRIORITY
+    int
+    default 89
+
+rsource "Kconfig.sg90"
+
+endif

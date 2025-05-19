@@ -1,0 +1,57 @@
+/ {
+    chosen {
+        sesimo,bofp1 = &bofp1;
+        sesimo,usb = &zephyr_udc0;
+        zephyr,log-uart = &log_uarts;
+    };
+
+    log_uarts: log_uarts {
+        compatible = "zephyr,log-uart";
+        uarts = <&cdc_acm_uart0 &uart4>;
+    };
+
+    light0: light0 {
+        status = "okay";
+        compatible = "sesimo,sg90-light";
+        pwms = <&pwm2 4 20000000 (PWM_POLARITY_NORMAL)>;
+        pwm-names = "pwm";
+        dc-off = <800000>;
+        dc-on = <1700000>;
+    };
+};
+
+&spi1 {
+	status = "okay";
+
+    bofp1: bofp1@0 {
+        status = "okay";
+        compatible = "sesimo,bofp1";
+        reg = <0>;
+        spi-max-frequency = <10000000>;
+        light = <&light0>;
+        clkdiv = <125>;
+        busy-gpios = <&gpioc 5 (GPIO_ACTIVE_HIGH | GPIO_PULL_DOWN)>;
+        fifo-wmark-gpios = <&gpioc 4 (GPIO_ACTIVE_HIGH | GPIO_PULL_DOWN)>;
+        integration-time = <600000>;
+        total-avg-n = <5>;
+        moving-avg-n = <7>;
+        dark-current;
+        moving-avg;
+        total-avg;
+    };
+};
+
+&cdc_acm_uart0 {
+    status = "okay";
+};
+
+&timers2 {
+    status = "okay";
+    st,prescaler = <99>;
+
+    pwm2: pwm {
+        status = "okay";
+        pinctrl-0 = <&tim2_ch4_remap2_pwm_out_pb11>;
+        pinctrl-names = "default";
+    };
+};

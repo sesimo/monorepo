@@ -1,0 +1,6 @@
+board:
+  name: sesimo_bomc1
+  full_name: SESIMO BOMC1 Spectrometer
+  vendor: sesimo
+  socs:
+  - name: stm32f103xb

@@ -1,0 +1,15 @@
+
+#include <zephyr/drivers/sensor.h>
+
+enum sensor_attr_bofp1 {
+        SENSOR_ATTR_BOFP1_INTEGRATION = SENSOR_ATTR_PRIV_START,
+        SENSOR_ATTR_BOFP1_TOTAL_AVG_N,
+        SENSOR_ATTR_BOFP1_MOVING_AVG_N,
+        SENSOR_ATTR_BOFP1_TOTAL_AVG_ENA,
+        SENSOR_ATTR_BOFP1_MOVING_AVG_ENA,
+        SENSOR_ATTR_BOFP1_DARK_CURRENT_ENA
+};
+
+enum sensor_channel_bofp1 {
+        SENSOR_CHAN_BOFP1_INTENSITY = SENSOR_ATTR_PRIV_START
+};

@@ -1,0 +1,22 @@
+
+include: [base.yaml]
+
+compatible: sesimo,sg90-light
+description: Device driver for the SG90 driven light source
+
+properties:
+  pwms:
+    type: phandle-array
+    required: true
+
+  pwm-names:
+    type: string-array
+    required: true
+
+  dc-on:
+    type: int
+    required: true
+
+  dc-off:
+    type: int
+    required: true

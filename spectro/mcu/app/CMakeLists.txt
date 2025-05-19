@@ -8,4 +8,4 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 find_package(Zephyr REQUIRED)
 project(spectro-app)
 
-target_sources(app PRIVATE src/main.c)
+add_subdirectory(src)

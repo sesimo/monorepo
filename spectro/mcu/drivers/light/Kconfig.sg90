@@ -1,0 +1,6 @@
+
+config LIGHT_SG90
+    bool
+    default y
+    select PWM
+    depends on DT_HAS_SESIMO_SG90_LIGHT_ENABLED

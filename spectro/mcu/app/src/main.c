@@ -1,20 +1,20 @@
 
-#include <stdio.h>
 #include <zephyr/kernel.h>
+#include <zephyr/logging/log.h>
 
-static const struct device *dev = DEVICE_DT_GET_ANY(toshiba_tcd1304);
+#include "usb/usb.h"
+
+LOG_MODULE_REGISTER(app);
 
 int main(void)
 {
-        if (!device_is_ready(dev)) {
-                (void)printf("CCD not set up\n");
-        }
+        int status;
 
-        for (;;) {
-                (void)printf("Hello World\n");
-
-                k_sleep(K_MSEC(1000));
+        status = bomc1_usb_init();
+        if (status != 0) {
+                LOG_ERR("usb init failed: %i", status);
+                return status;
         }
 
         return 0;
-}
+};

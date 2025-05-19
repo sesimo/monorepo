@@ -1,0 +1,20 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "bomc1"
+version = "2025.0.0"
+dependencies = [
+    "pyusb",
+    "matplotlib",
+    "numpy"
+]
+requires-python = ">=3.10"
+authors = [
+  {name = "Sigmund Klåpbakken", email = "sigmundklaa@outlook.com"},
+]
+description = "BOMC1 Spectrometer interface"
+
+[project.scripts]
+bomc1 = "bomc1.main:entrypoint"
